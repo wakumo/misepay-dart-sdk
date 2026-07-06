@@ -1,0 +1,14 @@
+name: misepay_sdk
+description: Dart SDK for MisePay PaymentIntent checkout flows.
+version: 0.1.0
+repository: https://github.com/wakumo/misepay-dart-sdk
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  http: ^1.2.2
+
+dev_dependencies:
+  lints: ^5.0.0
+  test: ^1.25.8
