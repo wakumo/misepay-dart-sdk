@@ -3,7 +3,6 @@ class PaymentOption {
   /// Creates an immutable payment option.
   const PaymentOption({
     required this.chainId,
-    required this.chainName,
     required this.assetSymbol,
     required this.assetDecimals,
     required this.tokenAddress,
@@ -14,7 +13,6 @@ class PaymentOption {
   /// Parses a payment option from API JSON.
   factory PaymentOption.fromJson(Map<String, dynamic> json) => PaymentOption(
         chainId: json['chain_id'] as int,
-        chainName: json['chain_name'] as String,
         assetSymbol: json['asset_symbol'] as String,
         assetDecimals: json['asset_decimals'] as int,
         tokenAddress: json['token_address'] as String,
@@ -24,9 +22,6 @@ class PaymentOption {
 
   /// Chain id where this payment option can be paid.
   final int chainId;
-
-  /// Human-readable chain name.
-  final String chainName;
 
   /// Token or asset symbol.
   final String assetSymbol;
@@ -46,7 +41,6 @@ class PaymentOption {
   /// Serializes this value back to API-shaped JSON.
   Map<String, dynamic> toJson() => {
         'chain_id': chainId,
-        'chain_name': chainName,
         'asset_symbol': assetSymbol,
         'asset_decimals': assetDecimals,
         'token_address': tokenAddress,

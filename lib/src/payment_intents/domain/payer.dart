@@ -5,12 +5,12 @@ class Payer {
 
   /// Parses payer context from API JSON.
   factory Payer.fromJson(Map<String, dynamic> json) => Payer(
-        address: json['address'] as String,
+        address: json['address'] as String?,
         point: PayerPoint.fromJson(json['point'] as Map<String, dynamic>),
       );
 
   /// Payer wallet address.
-  final String address;
+  final String? address;
 
   /// Payer point balance, selected amount, and selection limits.
   final PayerPoint point;
@@ -29,7 +29,7 @@ class PayerPoint {
     required this.label,
     required this.balance,
     required this.intent,
-    required this.limits,
+    this.limits,
   });
 
   /// Parses point context from API JSON.
@@ -37,7 +37,9 @@ class PayerPoint {
         label: json['label'] as String,
         balance: PointBalance.fromJson(json['balance'] as Map<String, dynamic>),
         intent: PointIntent.fromJson(json['intent'] as Map<String, dynamic>),
-        limits: PointLimits.fromJson(json['limits'] as Map<String, dynamic>),
+        limits: json['limits'] == null
+            ? null
+            : PointLimits.fromJson(json['limits'] as Map<String, dynamic>),
       );
 
   /// Display label for the point program.
@@ -50,14 +52,14 @@ class PayerPoint {
   final PointIntent intent;
 
   /// Selection limits for this PaymentIntent.
-  final PointLimits limits;
+  final PointLimits? limits;
 
   /// Serializes this value back to API-shaped JSON.
   Map<String, dynamic> toJson() => {
         'label': label,
         'balance': balance.toJson(),
         'intent': intent.toJson(),
-        'limits': limits.toJson(),
+        if (limits != null) 'limits': limits!.toJson(),
       };
 }
 
