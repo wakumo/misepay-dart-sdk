@@ -7,25 +7,28 @@ This package implements the client-side Dart SDK for the MisePay PaymentIntent p
 ## Core SDK Contract
 
 ```dart
-final paymentIntent = await misepayClient.getPaymentIntent(
+final paymentIntent = await misepayClient.paymentIntents.get(
   requestUri: requestUri,
   payerAddress: payerAddress,
 );
 
-final authorization = paymentIntent.buildPointAuthorization(
+final authorization = misepayClient.paymentIntents.authorizePoints(
+  paymentIntent: paymentIntent,
   pointAmount: '1200',
 );
 
 final signature = await signer.signTypedData(authorization.typedData);
 
-final updatedPaymentIntent = await paymentIntent.submitPointAuthorization(
+final updatedPaymentIntent = await misepayClient.paymentIntents.applyPoints(
+  paymentIntent: paymentIntent,
   authorization: authorization,
   signature: signature,
 );
 
 final selectedOption = updatedPaymentIntent.paymentOptions.first;
 
-await updatedPaymentIntent.submitTransactionHash(
+await misepayClient.paymentIntents.provePayment(
+  paymentIntent: updatedPaymentIntent,
   chainId: selectedOption.chainId,
   tokenAddress: selectedOption.tokenAddress,
   txHash: txHash,
@@ -40,7 +43,7 @@ await updatedPaymentIntent.submitTransactionHash(
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.
 - Point lookup is scoped by PaymentIntent merchant/owner scope plus payer address.
 - Payment chain is not part of point identity.
-- `buildPointAuthorization` is local SDK logic and MUST NOT call a quote endpoint.
+- `authorizePoints` is local SDK logic and MUST NOT call a quote endpoint.
 - Any point amount change requires EIP-712 signature.
 - If current point amount is already `0`, cancellation is a no-op and should not submit.
 

@@ -1,38 +1,27 @@
-import 'dart:convert';
-
 import 'package:http/http.dart' as http;
 
-import 'models.dart';
+import 'payment_intents/data/payment_intent_api.dart';
+import 'payment_intents/domain/payment_intent_repository.dart';
+import 'payment_intents/payment_intents_client.dart';
+import 'payment_intents/services/point_authorization_service.dart';
 
+/// Public facade for MisePay PaymentIntent checkout operations.
 class MisePayClient {
-  MisePayClient({http.Client? httpClient})
-      : _httpClient = httpClient ?? http.Client();
+  /// Creates a client with an optional HTTP client or repository override.
+  ///
+  /// Most apps should pass no arguments. Tests can inject [httpClient] or a
+  /// custom [paymentIntentRepository].
+  MisePayClient({
+    http.Client? httpClient,
+    PaymentIntentRepository? paymentIntentRepository,
+    PointAuthorizationService pointAuthorizationService =
+        const PointAuthorizationService(),
+  }) : paymentIntents = PaymentIntentsClient(
+          repository: paymentIntentRepository ??
+              PaymentIntentApi(httpClient: httpClient ?? http.Client()),
+          pointAuthorizationService: pointAuthorizationService,
+        );
 
-  final http.Client _httpClient;
-
-  Future<PaymentIntent> getPaymentIntent({
-    required String requestUri,
-    String? payerAddress,
-  }) async {
-    final uri = _buildRequestUri(requestUri, payerAddress);
-    final response = await _httpClient.get(uri);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw MisePayException(
-          'HTTP_ERROR', 'MisePay API returned status ${response.statusCode}.');
-    }
-    return PaymentIntent.fromJson(
-        jsonDecode(response.body) as Map<String, dynamic>,
-        httpClient: _httpClient);
-  }
-
-  Uri _buildRequestUri(String requestUri, String? payerAddress) {
-    final uri = Uri.parse(requestUri);
-    if (payerAddress == null) {
-      return uri;
-    }
-    return uri.replace(queryParameters: {
-      ...uri.queryParameters,
-      'payer_address': payerAddress
-    });
-  }
+  /// PaymentIntent resource operations.
+  final PaymentIntentsClient paymentIntents;
 }

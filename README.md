@@ -2,6 +2,109 @@
 
 Dart SDK for MisePay PaymentIntent checkout flows.
 
-The first implementation targets Avacus app integration and stays Flutter-independent. Apps provide the selected payer address and signer; the SDK fetches PaymentIntent state, builds EIP-712 point authorization typed data, submits signed point authorizations, and submits transaction hashes for optional payment proof acceleration.
+The SDK is Flutter-independent. Apps provide the selected payer address and signer; the SDK fetches PaymentIntent state, builds EIP-712 point authorization typed data, submits signed point authorizations, and submits transaction hashes for optional payment proof acceleration.
 
 See `docs/payment-intent-sdk-payload-format.md` for the contract used by both the MisePay backend and this SDK.
+
+## Install
+
+Until the package is published, load it directly from GitHub:
+
+```yaml
+dependencies:
+  misepay_sdk:
+    git:
+      url: https://github.com/wakumo/misepay-dart-sdk.git
+      ref: main
+```
+
+After publishing to pub.dev, use the package version instead:
+
+```yaml
+dependencies:
+  misepay_sdk: ^0.1.0
+```
+
+## Usage
+
+Create a client and fetch the PaymentIntent from the `requestUri` returned by MisePay checkout creation.
+
+```dart
+import 'package:misepay_sdk/misepay_sdk.dart';
+
+final client = MisePayClient();
+
+final paymentIntent = await client.paymentIntents.get(
+  requestUri: requestUri,
+  payerAddress: payerAddress,
+);
+```
+
+Read response data through typed fields:
+
+```dart
+paymentIntent.id;
+paymentIntent.status;
+paymentIntent.merchant.name;
+paymentIntent.store.name;
+paymentIntent.amount.gross;
+paymentIntent.amount.net;
+paymentIntent.payer?.point.balance.available;
+paymentIntent.paymentOptions.first.amountBaseUnits;
+```
+
+Serialize typed response data when you need to cache, log, debug, or pass data across app layers:
+
+```dart
+final json = paymentIntent.toJson();
+```
+
+## Point Authorization
+
+When the payer wants to apply points, build EIP-712 typed data from the full `PaymentIntent`. The full object is required because validation depends on payer, amount, limits, and expiry data.
+
+```dart
+final authorization = client.paymentIntents.authorizePoints(
+  paymentIntent: paymentIntent,
+  pointAmount: '1200',
+);
+
+final typedData = authorization.typedData;
+final signature = await signer.signTypedData(typedData);
+
+final updatedIntent = await client.paymentIntents.applyPoints(
+  paymentIntent: paymentIntent,
+  authorization: authorization,
+  signature: signature,
+);
+```
+
+`pointAmount` is a non-negative integer string. Money, points, and token base-unit amounts are represented as strings; do not convert them to floating point values.
+
+## Payment Proof
+
+After sending the on-chain payment, submit the transaction hash to the action URL returned by the PaymentIntent.
+
+```dart
+final paidIntent = await client.paymentIntents.provePayment(
+  paymentIntent: updatedIntent,
+  chainId: 137,
+  tokenAddress: '0xJPYCPolygon',
+  txHash: '0xtx',
+);
+```
+
+## Errors
+
+SDK validation and HTTP errors throw `MisePayException`:
+
+```dart
+try {
+  final paymentIntent = await client.paymentIntents.get(requestUri: requestUri);
+} on MisePayException catch (error) {
+  print(error.code);
+  print(error.message);
+}
+```
+
+Common codes include `HTTP_ERROR`, `UNKNOWN_STATUS`, `PAYER_REQUIRED`, `INVALID_POINT_AMOUNT`, `POINT_AMOUNT_EXCEEDS_MAX`, `POINT_AMOUNT_UNCHANGED`, and `POINT_AMOUNT_EXCEEDS_GROSS`.

@@ -6,7 +6,7 @@ import 'package:misepay_sdk/misepay_sdk.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('MisePayClient.getPaymentIntent', () {
+  group('MisePayClient.paymentIntents.get', () {
     test('fetches requestUri as-is when payerAddress is omitted', () async {
       final requestedUris = <Uri>[];
       final client = MisePayClient(
@@ -16,7 +16,7 @@ void main() {
         }),
       );
 
-      final intent = await client.getPaymentIntent(
+      final intent = await client.paymentIntents.get(
         requestUri:
             'https://api-dev.misepay.app/v1/payment-intents/pi_123?locale=ja',
       );
@@ -36,7 +36,7 @@ void main() {
         }),
       );
 
-      final intent = await client.getPaymentIntent(
+      final intent = await client.paymentIntents.get(
         requestUri:
             'https://api-dev.misepay.app/v1/payment-intents/pi_123?locale=ja',
         payerAddress: '0xabc',
@@ -57,7 +57,7 @@ void main() {
         }),
       );
 
-      await client.getPaymentIntent(
+      await client.paymentIntents.get(
         requestUri:
             'https://api-dev.misepay.app/v1/payment-intents/pi_123?payer_address=0xold',
         payerAddress: '0xnew',
@@ -67,12 +67,16 @@ void main() {
     });
   });
 
-  group('PaymentIntent.buildPointAuthorization', () {
+  group('PaymentIntentsClient.authorizePoints', () {
     test('builds PaymentIntentPointAuthorization typed data', () {
+      final client = MisePayClient();
       final intent =
           PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
 
-      final authorization = intent.buildPointAuthorization(pointAmount: '1200');
+      final authorization = client.paymentIntents.authorizePoints(
+        paymentIntent: intent,
+        pointAmount: '1200',
+      );
 
       expect(authorization.typedData['primaryType'],
           'PaymentIntentPointAuthorization');
@@ -89,59 +93,79 @@ void main() {
     });
 
     test('rejects missing payer context', () {
+      final client = MisePayClient();
       final intent = PaymentIntent.fromJson(_paymentIntentJson());
 
       expect(
-        () => intent.buildPointAuthorization(pointAmount: '1200'),
+        () => client.paymentIntents
+            .authorizePoints(paymentIntent: intent, pointAmount: '1200'),
         throwsA(isA<MisePayException>()
             .having((error) => error.code, 'code', 'PAYER_REQUIRED')),
       );
     });
 
     test('rejects invalid point amounts', () {
+      final client = MisePayClient();
       final intent =
           PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
 
       expect(
-        () => intent.buildPointAuthorization(pointAmount: '-1'),
+        () => client.paymentIntents
+            .authorizePoints(paymentIntent: intent, pointAmount: '-1'),
         throwsA(isA<MisePayException>()
             .having((error) => error.code, 'code', 'INVALID_POINT_AMOUNT')),
       );
       expect(
-        () => intent.buildPointAuthorization(pointAmount: '3001'),
+        () => client.paymentIntents
+            .authorizePoints(paymentIntent: intent, pointAmount: '3001'),
         throwsA(isA<MisePayException>()
             .having((error) => error.code, 'code', 'POINT_AMOUNT_EXCEEDS_MAX')),
       );
       expect(
-        () => intent.buildPointAuthorization(pointAmount: '1200'),
+        () => client.paymentIntents
+            .authorizePoints(paymentIntent: intent, pointAmount: '1200'),
         returnsNormally,
       );
       expect(
-        () => PaymentIntent.fromJson(
-                _paymentIntentJson(payer: _payerJson(intentAmount: '1200')))
-            .buildPointAuthorization(pointAmount: '1200'),
+        () => client.paymentIntents.authorizePoints(
+          paymentIntent: PaymentIntent.fromJson(
+              _paymentIntentJson(payer: _payerJson(intentAmount: '1200'))),
+          pointAmount: '1200',
+        ),
         throwsA(isA<MisePayException>()
             .having((error) => error.code, 'code', 'POINT_AMOUNT_UNCHANGED')),
       );
     });
   });
 
+  group('PaymentIntent serialization', () {
+    test('round-trips typed response models to JSON', () {
+      final json = _paymentIntentJson(payer: _payerJson());
+      final intent = PaymentIntent.fromJson(json);
+
+      expect(intent.toJson(), json);
+    });
+  });
+
   group('PaymentIntent action submissions', () {
     test('submits point authorization to action URL', () async {
       final requests = <http.Request>[];
-      final intent = PaymentIntent.fromJson(
-        _paymentIntentJson(
-          payer: _payerJson(intentAmount: '0'),
-          httpClient: MockClient((request) async {
-            requests.add(request);
-            return _jsonResponse(_paymentIntentJson(
-                payer: _payerJson(intentAmount: '1200', available: '3800')));
-          }),
-        ),
+      final client = MisePayClient(
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          return _jsonResponse(_paymentIntentJson(
+              payer: _payerJson(intentAmount: '1200', available: '3800')));
+        }),
       );
-      final authorization = intent.buildPointAuthorization(pointAmount: '1200');
+      final intent = PaymentIntent.fromJson(
+          _paymentIntentJson(payer: _payerJson(intentAmount: '0')));
+      final authorization = client.paymentIntents.authorizePoints(
+        paymentIntent: intent,
+        pointAmount: '1200',
+      );
 
-      final updated = await intent.submitPointAuthorization(
+      final updated = await client.paymentIntents.applyPoints(
+        paymentIntent: intent,
         authorization: authorization,
         signature: '0xsig',
       );
@@ -158,20 +182,20 @@ void main() {
 
     test('submits transaction hash to action URL', () async {
       final requests = <http.Request>[];
-      final intent = PaymentIntent.fromJson(
-        _paymentIntentJson(
-          payer: _payerJson(),
-          httpClient: MockClient((request) async {
-            requests.add(request);
-            return _jsonResponse({
-              ..._paymentIntentJson(payer: _payerJson()),
-              'status': 'requires_payment'
-            });
-          }),
-        ),
+      final client = MisePayClient(
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          return _jsonResponse({
+            ..._paymentIntentJson(payer: _payerJson()),
+            'status': 'requires_payment'
+          });
+        }),
       );
+      final intent =
+          PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
 
-      final updated = await intent.submitTransactionHash(
+      final updated = await client.paymentIntents.provePayment(
+        paymentIntent: intent,
         chainId: 137,
         tokenAddress: '0xJPYCPolygon',
         txHash: '0xtx',
@@ -195,8 +219,7 @@ http.Response _jsonResponse(Map<String, dynamic> json) => http.Response(
       headers: {'content-type': 'application/json'},
     );
 
-Map<String, dynamic> _paymentIntentJson(
-    {Map<String, dynamic>? payer, http.Client? httpClient}) {
+Map<String, dynamic> _paymentIntentJson({Map<String, dynamic>? payer}) {
   final json = {
     'version': 1,
     'id': 'pi_123',
@@ -231,9 +254,6 @@ Map<String, dynamic> _paymentIntentJson(
   };
   if (payer != null) {
     json['payer'] = payer;
-  }
-  if (httpClient != null) {
-    json['__http_client'] = httpClient;
   }
   return json;
 }
