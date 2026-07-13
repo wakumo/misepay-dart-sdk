@@ -1,28 +1,40 @@
 import '../../core/integer_string.dart';
 import '../../core/misepay_exception.dart';
 import '../domain/payment_intent.dart';
+import '../domain/payment_option.dart';
 import '../domain/point_authorization.dart';
 
 class PointAuthorizationService {
-  const PointAuthorizationService();
+  const PointAuthorizationService({this.domainSalt = 'misepay:prod'});
+
+  final String domainSalt;
 
   PointAuthorization build({
     required PaymentIntent intent,
+    required PaymentOption paymentOption,
     required String pointAmount,
   }) {
     final payer = intent.payer;
-    if (payer == null) {
+    final payerAddress = payer?.address;
+    if (payerAddress == null) {
       throw MisePayException('PAYER_REQUIRED',
           'Payer context is required to build point authorization.');
     }
 
-    final selectedPointAmount =
-        parseNonNegativeIntegerString(pointAmount, 'INVALID_POINT_AMOUNT');
-    final maxPointAmount = BigInt.parse(payer.point.limits.max);
-    final currentPointAmount = BigInt.parse(payer.point.intent.amount);
-    final grossAmount = BigInt.parse(intent.amount.gross);
+    final selectedPointAmount = parseNonNegativeDecimalUnits(
+        pointAmount, paymentOption.assetDecimals, 'INVALID_POINT_AMOUNT');
+    final currentPointAmount = parseNonNegativeDecimalUnits(
+        payer!.point.intent.amount,
+        paymentOption.assetDecimals,
+        'INVALID_CURRENT_POINT_AMOUNT');
+    final maxPointAmount = payer.point.limits?.max == null
+        ? null
+        : parseNonNegativeDecimalUnits(payer.point.limits!.max,
+            paymentOption.assetDecimals, 'INVALID_POINT_LIMIT');
+    final grossAmount = parseNonNegativeDecimalUnits(intent.amount.gross,
+        paymentOption.assetDecimals, 'INVALID_GROSS_AMOUNT');
 
-    if (selectedPointAmount > maxPointAmount) {
+    if (maxPointAmount != null && selectedPointAmount > maxPointAmount) {
       throw MisePayException('POINT_AMOUNT_EXCEEDS_MAX',
           'Point amount exceeds maximum selectable amount.');
     }
@@ -39,7 +51,7 @@ class PointAuthorizationService {
     final expiresAtSeconds = intent.expiresAt.millisecondsSinceEpoch ~/ 1000;
     final message = <String, Object>{
       'intentId': intent.id,
-      'payer': payer.address,
+      'payer': payerAddress,
       'grossAmount': grossAmount.toString(),
       'pointAmount': selectedPointAmount.toString(),
       'netAmount': netAmount.toString(),
@@ -47,10 +59,14 @@ class PointAuthorizationService {
     };
 
     return PointAuthorization(
-      payerAddress: payer.address,
-      pointAmount: selectedPointAmount.toString(),
+      payerAddress: payerAddress,
+      pointAmount: pointAmount,
       typedData: {
-        'domain': {'name': 'MisePay PaymentIntent', 'version': '1'},
+        'domain': {
+          'name': 'MisePay PaymentIntent',
+          'version': '1',
+          'salt': domainSalt,
+        },
         'primaryType': 'PaymentIntentPointAuthorization',
         'types': {
           'PaymentIntentPointAuthorization': [

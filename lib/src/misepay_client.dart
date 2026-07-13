@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 
+import 'misepay_environment.dart';
 import 'payment_intents/data/payment_intent_api.dart';
 import 'payment_intents/domain/payment_intent_repository.dart';
 import 'payment_intents/payment_intents_client.dart';
@@ -14,12 +15,20 @@ class MisePayClient {
   MisePayClient({
     http.Client? httpClient,
     PaymentIntentRepository? paymentIntentRepository,
-    PointAuthorizationService pointAuthorizationService =
-        const PointAuthorizationService(),
+    MisePayEnv env = MisePayEnv.production,
+    MisePayOriginPolicy originPolicy = MisePayOriginPolicy.allowListed,
+    Set<String> allowedOrigins = const {},
   }) : paymentIntents = PaymentIntentsClient(
           repository: paymentIntentRepository ??
-              PaymentIntentApi(httpClient: httpClient ?? http.Client()),
-          pointAuthorizationService: pointAuthorizationService,
+              PaymentIntentApi(
+                httpClient: httpClient ?? http.Client(),
+                allowedOrigins: allowedOrigins.isEmpty
+                    ? env.defaultAllowedOrigins
+                    : allowedOrigins,
+                allowAllOrigins: originPolicy == MisePayOriginPolicy.allowAll,
+              ),
+          pointAuthorizationService:
+              PointAuthorizationService(domainSalt: env.domainSalt),
         );
 
   /// PaymentIntent resource operations.

@@ -1,4 +1,5 @@
 export 'src/core/misepay_exception.dart';
+export 'src/misepay_environment.dart';
 export 'src/misepay_client.dart';
 export 'src/payment_intents/payment_intents_client.dart';
 export 'src/payment_intents/domain/amount_summary.dart';

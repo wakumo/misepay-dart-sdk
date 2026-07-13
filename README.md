@@ -27,7 +27,7 @@ dependencies:
 
 ## Usage
 
-Create a client and fetch the PaymentIntent from the `requestUri` returned by MisePay checkout creation.
+Create a client and fetch the PaymentIntent from the `requestUri` returned by MisePay checkout creation. The default client uses the production MisePay origin and production EIP-712 domain salt.
 
 ```dart
 import 'package:misepay_sdk/misepay_sdk.dart';
@@ -37,6 +37,24 @@ final client = MisePayClient();
 final paymentIntent = await client.paymentIntents.get(
   requestUri: requestUri,
   payerAddress: payerAddress,
+);
+```
+
+Dev builds can select the development environment. The SDK derives the EIP-712 domain salt from the environment; app code does not supply `domainSalt`.
+
+```dart
+final devClient = MisePayClient(
+  env: MisePayEnv.development,
+  allowedOrigins: {'https://dev-apis.misepay.app'},
+);
+```
+
+Local development can use a permissive origin policy when needed:
+
+```dart
+final localClient = MisePayClient(
+  env: MisePayEnv.development,
+  originPolicy: MisePayOriginPolicy.allowAll,
 );
 ```
 
@@ -50,6 +68,7 @@ paymentIntent.store.name;
 paymentIntent.amount.gross;
 paymentIntent.amount.net;
 paymentIntent.payer?.point.balance.available;
+paymentIntent.paymentOptions.first.chainName;
 paymentIntent.paymentOptions.first.amountBaseUnits;
 ```
 
@@ -66,6 +85,7 @@ When the payer wants to apply points, build EIP-712 typed data from the full `Pa
 ```dart
 final authorization = client.paymentIntents.authorizePoints(
   paymentIntent: paymentIntent,
+  paymentOption: paymentIntent.paymentOptions.first,
   pointAmount: '1200',
 );
 
@@ -107,4 +127,4 @@ try {
 }
 ```
 
-Common codes include `HTTP_ERROR`, `UNKNOWN_STATUS`, `PAYER_REQUIRED`, `INVALID_POINT_AMOUNT`, `POINT_AMOUNT_EXCEEDS_MAX`, `POINT_AMOUNT_UNCHANGED`, and `POINT_AMOUNT_EXCEEDS_GROSS`.
+Common SDK codes include `UNTRUSTED_REQUEST_ORIGIN`, `ACTION_UNAVAILABLE`, `HTTP_ERROR`, `UNKNOWN_STATUS`, `PAYER_REQUIRED`, `INVALID_POINT_AMOUNT`, `POINT_AMOUNT_EXCEEDS_MAX`, `POINT_AMOUNT_UNCHANGED`, and `POINT_AMOUNT_EXCEEDS_GROSS`. Backend machine-readable error codes are preserved when present.
