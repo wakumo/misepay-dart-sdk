@@ -46,7 +46,7 @@ await misepayClient.paymentIntents.provePayment(
 - If `payerAddress` is provided, the SDK appends `payer_address` to the initial GET URL.
 - Follow-up API calls MUST use response `actions` URLs.
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.
-- Point lookup is backend-resolved as `merchant_id + point_type + holder_address`.
+- Point identity is backend-owned as `merchant_id + point_type + holder_address`. For the POC, `point_type` has a single backend default value. The SDK/app sends only `payerAddress`; it does not send or choose `point_type`.
 - Payment chain is not part of point identity.
 - EIP-712 domain `salt` is derived from the SDK environment, not from app input, the link, or the API response. Current values are `misepay:prod` for production and `misepay:dev` for development.
 - `authorizePoints` is local SDK logic and MUST NOT call a quote endpoint.

@@ -32,6 +32,14 @@ The SDK SHALL include an EIP-712 domain `salt` derived from `MisePayEnv` for poi
 - **WHEN** the SDK uses `MisePayEnv.development` and builds a point authorization
 - **THEN** the typed data domain includes `salt: misepay:dev`
 
+### Requirement: Backend-Owned Point Type
+
+The SDK SHALL NOT require or submit `point_type`; point identity is backend-owned as `merchant_id + point_type + holder_address`, and the POC uses a single backend default `point_type`.
+
+#### Scenario: SDK requests payer point context
+- **WHEN** the SDK fetches a PaymentIntent with `payerAddress`
+- **THEN** the SDK sends `payer_address` only and does not send `point_type`
+
 ### Requirement: Nullable PaymentIntent Actions
 
 The SDK SHALL model PaymentIntent action URLs as nullable stable keys and SHALL fail locally with `ACTION_UNAVAILABLE` when the caller invokes an unavailable action.
