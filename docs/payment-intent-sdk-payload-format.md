@@ -7,6 +7,11 @@ This package implements the client-side Dart SDK for the MisePay PaymentIntent p
 ## Core SDK Contract
 
 ```dart
+final misepayClient = MisePayClient(
+  allowedOrigins: {'https://apis.misepay.app'},
+  domainSalt: 'misepay:prod',
+);
+
 final paymentIntent = await misepayClient.paymentIntents.get(
   requestUri: requestUri,
   payerAddress: payerAddress,
@@ -14,6 +19,7 @@ final paymentIntent = await misepayClient.paymentIntents.get(
 
 final authorization = misepayClient.paymentIntents.authorizePoints(
   paymentIntent: paymentIntent,
+  paymentOption: paymentIntent.paymentOptions.first,
   pointAmount: '1200',
 );
 
@@ -38,11 +44,14 @@ await misepayClient.paymentIntents.provePayment(
 ## Key Rules
 
 - `requestUri` is the initial GET URL.
+- The SDK validates the `requestUri` origin against trusted app/build settings unless permissive origin mode is enabled.
+- The SDK validates origin only, not path. The backend route remains opaque to the SDK.
 - If `payerAddress` is provided, the SDK appends `payer_address` to the initial GET URL.
 - Follow-up API calls MUST use response `actions` URLs.
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.
-- Point lookup is scoped by PaymentIntent merchant/owner scope plus payer address.
+- Point lookup is backend-resolved as `merchant_id + point_type + holder_address`.
 - Payment chain is not part of point identity.
+- EIP-712 domain `salt` comes from trusted app/build settings, not from the link or API response. Current values are `misepay:prod` for prod/stg and `misepay:dev` for dev.
 - `authorizePoints` is local SDK logic and MUST NOT call a quote endpoint.
 - Any point amount change requires EIP-712 signature.
 - If current point amount is already `0`, cancellation is a no-op and should not submit.
@@ -96,7 +105,8 @@ await misepayClient.paymentIntents.provePayment(
 {
   "domain": {
     "name": "MisePay PaymentIntent",
-    "version": "1"
+    "version": "1",
+    "salt": "misepay:prod"
   },
   "primaryType": "PaymentIntentPointAuthorization",
   "types": {
@@ -139,3 +149,29 @@ await misepayClient.paymentIntents.provePayment(
   "tx_hash": "0x..."
 }
 ```
+
+## Actions
+
+Action keys are stable, but values may be null when an action is unavailable for the current PaymentIntent state. SDK methods fail locally with `ACTION_UNAVAILABLE` when called for a null action.
+
+## Trusted SDK Settings
+
+Production builds should configure the SDK with the production MisePay origin and production domain salt:
+
+```dart
+MisePayClient(
+  allowedOrigins: {'https://apis.misepay.app'},
+  domainSalt: 'misepay:prod',
+);
+```
+
+Dev builds may use permissive origin mode for local tunnels or temporary hosts, but should use the dev domain salt:
+
+```dart
+MisePayClient(
+  allowAllOrigins: true,
+  domainSalt: 'misepay:dev',
+);
+```
+
+These settings are trusted app/build configuration. They must not be read from `request_uri`, query parameters, user input, or the PaymentIntent API response.

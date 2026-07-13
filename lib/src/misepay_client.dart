@@ -14,12 +14,18 @@ class MisePayClient {
   MisePayClient({
     http.Client? httpClient,
     PaymentIntentRepository? paymentIntentRepository,
-    PointAuthorizationService pointAuthorizationService =
-        const PointAuthorizationService(),
+    Set<String> allowedOrigins = const {},
+    bool allowAllOrigins = false,
+    String domainSalt = 'misepay:prod',
   }) : paymentIntents = PaymentIntentsClient(
           repository: paymentIntentRepository ??
-              PaymentIntentApi(httpClient: httpClient ?? http.Client()),
-          pointAuthorizationService: pointAuthorizationService,
+              PaymentIntentApi(
+                httpClient: httpClient ?? http.Client(),
+                allowedOrigins: allowedOrigins,
+                allowAllOrigins: allowAllOrigins,
+              ),
+          pointAuthorizationService:
+              PointAuthorizationService(domainSalt: domainSalt),
         );
 
   /// PaymentIntent resource operations.

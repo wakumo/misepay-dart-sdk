@@ -27,16 +27,28 @@ dependencies:
 
 ## Usage
 
-Create a client and fetch the PaymentIntent from the `requestUri` returned by MisePay checkout creation.
+Create a client with trusted app/build settings and fetch the PaymentIntent from the `requestUri` returned by MisePay checkout creation.
 
 ```dart
 import 'package:misepay_sdk/misepay_sdk.dart';
 
-final client = MisePayClient();
+final client = MisePayClient(
+  allowedOrigins: {'https://apis.misepay.app'},
+  domainSalt: 'misepay:prod',
+);
 
 final paymentIntent = await client.paymentIntents.get(
   requestUri: requestUri,
   payerAddress: payerAddress,
+);
+```
+
+`allowedOrigins`, `allowAllOrigins`, and `domainSalt` must come from trusted app/build configuration, not from the request link or API response. Production builds should allow only the production MisePay origin. Dev builds may use permissive origin mode when needed:
+
+```dart
+final devClient = MisePayClient(
+  allowAllOrigins: true,
+  domainSalt: 'misepay:dev',
 );
 ```
 
@@ -50,6 +62,7 @@ paymentIntent.store.name;
 paymentIntent.amount.gross;
 paymentIntent.amount.net;
 paymentIntent.payer?.point.balance.available;
+paymentIntent.paymentOptions.first.chainName;
 paymentIntent.paymentOptions.first.amountBaseUnits;
 ```
 
@@ -66,6 +79,7 @@ When the payer wants to apply points, build EIP-712 typed data from the full `Pa
 ```dart
 final authorization = client.paymentIntents.authorizePoints(
   paymentIntent: paymentIntent,
+  paymentOption: paymentIntent.paymentOptions.first,
   pointAmount: '1200',
 );
 
@@ -107,4 +121,4 @@ try {
 }
 ```
 
-Common codes include `HTTP_ERROR`, `UNKNOWN_STATUS`, `PAYER_REQUIRED`, `INVALID_POINT_AMOUNT`, `POINT_AMOUNT_EXCEEDS_MAX`, `POINT_AMOUNT_UNCHANGED`, and `POINT_AMOUNT_EXCEEDS_GROSS`.
+Common SDK codes include `UNTRUSTED_REQUEST_ORIGIN`, `ACTION_UNAVAILABLE`, `HTTP_ERROR`, `UNKNOWN_STATUS`, `PAYER_REQUIRED`, `INVALID_POINT_AMOUNT`, `POINT_AMOUNT_EXCEEDS_MAX`, `POINT_AMOUNT_UNCHANGED`, and `POINT_AMOUNT_EXCEEDS_GROSS`. Backend machine-readable error codes are preserved when present.

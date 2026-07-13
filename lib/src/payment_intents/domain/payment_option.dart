@@ -8,11 +8,13 @@ class PaymentOption {
     required this.tokenAddress,
     required this.recipientAddress,
     required this.amountBaseUnits,
+    this.chainName,
   });
 
   /// Parses a payment option from API JSON.
   factory PaymentOption.fromJson(Map<String, dynamic> json) => PaymentOption(
         chainId: json['chain_id'] as int,
+        chainName: json['chain_name'] as String?,
         assetSymbol: json['asset_symbol'] as String,
         assetDecimals: json['asset_decimals'] as int,
         tokenAddress: json['token_address'] as String,
@@ -22,6 +24,9 @@ class PaymentOption {
 
   /// Chain id where this payment option can be paid.
   final int chainId;
+
+  /// Optional display name for the chain.
+  final String? chainName;
 
   /// Token or asset symbol.
   final String assetSymbol;
@@ -41,6 +46,7 @@ class PaymentOption {
   /// Serializes this value back to API-shaped JSON.
   Map<String, dynamic> toJson() => {
         'chain_id': chainId,
+        if (chainName != null) 'chain_name': chainName,
         'asset_symbol': assetSymbol,
         'asset_decimals': assetDecimals,
         'token_address': tokenAddress,

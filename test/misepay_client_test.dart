@@ -10,6 +10,7 @@ void main() {
     test('fetches requestUri as-is when payerAddress is omitted', () async {
       final requestedUris = <Uri>[];
       final client = MisePayClient(
+        allowedOrigins: {'https://api-dev.misepay.app'},
         httpClient: MockClient((request) async {
           requestedUris.add(request.url);
           return _jsonResponse(_paymentIntentJson());
@@ -30,6 +31,7 @@ void main() {
     test('adds payer_address while preserving existing query params', () async {
       final requestedUris = <Uri>[];
       final client = MisePayClient(
+        allowedOrigins: {'https://api-dev.misepay.app'},
         httpClient: MockClient((request) async {
           requestedUris.add(request.url);
           return _jsonResponse(_paymentIntentJson(payer: _payerJson()));
@@ -50,6 +52,7 @@ void main() {
     test('replaces an existing payer_address query param', () async {
       final requestedUris = <Uri>[];
       final client = MisePayClient(
+        allowedOrigins: {'https://api-dev.misepay.app'},
         httpClient: MockClient((request) async {
           requestedUris.add(request.url);
           return _jsonResponse(
@@ -65,11 +68,51 @@ void main() {
 
       expect(requestedUris.single.queryParameters, {'payer_address': '0xnew'});
     });
+
+    test('rejects requestUri from untrusted origin before fetching', () async {
+      final requestedUris = <Uri>[];
+      final client = MisePayClient(
+        allowedOrigins: {'https://apis.misepay.app'},
+        domainSalt: 'misepay:prod',
+        httpClient: MockClient((request) async {
+          requestedUris.add(request.url);
+          return _jsonResponse(_paymentIntentJson());
+        }),
+      );
+
+      await expectLater(
+        client.paymentIntents.get(
+          requestUri: 'https://evil.example/v1/payment-intents/pi_123',
+        ),
+        throwsA(isA<MisePayException>()
+            .having((error) => error.code, 'code', 'UNTRUSTED_REQUEST_ORIGIN')),
+      );
+      expect(requestedUris, isEmpty);
+    });
+
+    test('allows any requestUri origin when allowAllOrigins is enabled',
+        () async {
+      final requestedUris = <Uri>[];
+      final client = MisePayClient(
+        allowAllOrigins: true,
+        domainSalt: 'misepay:dev',
+        httpClient: MockClient((request) async {
+          requestedUris.add(request.url);
+          return _jsonResponse(_paymentIntentJson());
+        }),
+      );
+
+      await client.paymentIntents.get(
+        requestUri: 'https://local-tunnel.example/v1/payment-intents/pi_123',
+      );
+
+      expect(requestedUris.single.origin, 'https://local-tunnel.example');
+    });
   });
 
   group('PaymentIntentsClient.authorizePoints', () {
     test('builds PaymentIntentPointAuthorization typed data', () {
-      final client = MisePayClient();
+      final client = MisePayClient(domainSalt: 'misepay:prod');
       final intent =
           PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
 
@@ -81,8 +124,11 @@ void main() {
 
       expect(authorization.typedData['primaryType'],
           'PaymentIntentPointAuthorization');
-      expect(authorization.typedData['domain'],
-          {'name': 'MisePay PaymentIntent', 'version': '1'});
+      expect(authorization.typedData['domain'], {
+        'name': 'MisePay PaymentIntent',
+        'version': '1',
+        'salt': 'misepay:prod'
+      });
       expect(authorization.message, {
         'intentId': 'pi_123',
         'payer': '0xabc',
@@ -191,6 +237,16 @@ void main() {
 
       expect(intent.toJson(), json);
     });
+
+    test('parses and serializes payment option chain name', () {
+      final json = _paymentIntentJson(chainName: 'Polygon');
+      final intent = PaymentIntent.fromJson(json);
+
+      expect(intent.paymentOptions.single.chainName, 'Polygon');
+      expect(intent.toJson()['payment_options'], [
+        containsPair('chain_name', 'Polygon'),
+      ]);
+    });
   });
 
   group('PaymentIntent action submissions', () {
@@ -257,6 +313,103 @@ void main() {
       });
       expect(updated.status, PaymentIntentStatus.requiresPayment);
     });
+
+    test('fails locally when point authorization action is unavailable',
+        () async {
+      final requests = <http.Request>[];
+      final client = MisePayClient(
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          return _jsonResponse(_paymentIntentJson());
+        }),
+      );
+      final intent = PaymentIntent.fromJson(_paymentIntentJson(
+        payer: _payerJson(),
+        actions: {
+          'submit_point_authorization': null,
+          'submit_payment_proof':
+              'https://api-dev.misepay.app/v1/payment-intents/pi_123/payment-proofs',
+        },
+      ));
+      final authorization = client.paymentIntents.authorizePoints(
+        paymentIntent: intent,
+        paymentOption: intent.paymentOptions.single,
+        pointAmount: '2',
+      );
+
+      await expectLater(
+        client.paymentIntents.applyPoints(
+          paymentIntent: intent,
+          authorization: authorization,
+          signature: '0xsig',
+        ),
+        throwsA(isA<MisePayException>()
+            .having((error) => error.code, 'code', 'ACTION_UNAVAILABLE')),
+      );
+      expect(requests, isEmpty);
+    });
+
+    test('fails locally when payment proof action is unavailable', () async {
+      final requests = <http.Request>[];
+      final client = MisePayClient(
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          return _jsonResponse(_paymentIntentJson());
+        }),
+      );
+      final intent = PaymentIntent.fromJson(_paymentIntentJson(
+        payer: _payerJson(),
+        actions: {
+          'submit_point_authorization':
+              'https://api-dev.misepay.app/v1/payment-intents/pi_123/benefits',
+          'submit_payment_proof': null,
+        },
+      ));
+
+      await expectLater(
+        client.paymentIntents.provePayment(
+          paymentIntent: intent,
+          chainId: 137,
+          tokenAddress: '0xJPYCPolygon',
+          txHash: '0xtx',
+        ),
+        throwsA(isA<MisePayException>()
+            .having((error) => error.code, 'code', 'ACTION_UNAVAILABLE')),
+      );
+      expect(requests, isEmpty);
+    });
+
+    test('preserves backend machine-readable error codes', () async {
+      final client = MisePayClient(
+        httpClient: MockClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'code': 'invalid_signature',
+              'message': 'Invalid point authorization signature.',
+            }),
+            400,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      final intent =
+          PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
+      final authorization = client.paymentIntents.authorizePoints(
+        paymentIntent: intent,
+        paymentOption: intent.paymentOptions.single,
+        pointAmount: '2',
+      );
+
+      await expectLater(
+        client.paymentIntents.applyPoints(
+          paymentIntent: intent,
+          authorization: authorization,
+          signature: '0xbad',
+        ),
+        throwsA(isA<MisePayException>()
+            .having((error) => error.code, 'code', 'invalid_signature')),
+      );
+    });
   });
 }
 
@@ -266,7 +419,11 @@ http.Response _jsonResponse(Map<String, dynamic> json) => http.Response(
       headers: {'content-type': 'application/json'},
     );
 
-Map<String, dynamic> _paymentIntentJson({Map<String, dynamic>? payer}) {
+Map<String, dynamic> _paymentIntentJson({
+  Map<String, dynamic>? payer,
+  Map<String, dynamic>? actions,
+  String? chainName,
+}) {
   final json = {
     'version': 1,
     'id': 'pi_123',
@@ -282,6 +439,7 @@ Map<String, dynamic> _paymentIntentJson({Map<String, dynamic>? payer}) {
     'payment_options': [
       {
         'chain_id': 137,
+        if (chainName != null) 'chain_name': chainName,
         'asset_symbol': 'JPYC',
         'asset_decimals': 18,
         'token_address': '0xJPYCPolygon',
@@ -290,12 +448,13 @@ Map<String, dynamic> _paymentIntentJson({Map<String, dynamic>? payer}) {
             payer == null ? '10500000000000000000' : '8500000000000000000',
       },
     ],
-    'actions': {
-      'submit_point_authorization':
-          'https://api-dev.misepay.app/v1/payment-intents/pi_123/benefits',
-      'submit_payment_proof':
-          'https://api-dev.misepay.app/v1/payment-intents/pi_123/payment-proofs',
-    },
+    'actions': actions ??
+        {
+          'submit_point_authorization':
+              'https://api-dev.misepay.app/v1/payment-intents/pi_123/benefits',
+          'submit_payment_proof':
+              'https://api-dev.misepay.app/v1/payment-intents/pi_123/payment-proofs',
+        },
     'expires_at': '2026-07-06T12:05:00Z',
   };
   if (payer != null) {

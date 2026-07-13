@@ -5,7 +5,9 @@ import '../domain/payment_option.dart';
 import '../domain/point_authorization.dart';
 
 class PointAuthorizationService {
-  const PointAuthorizationService();
+  const PointAuthorizationService({this.domainSalt = 'misepay:prod'});
+
+  final String domainSalt;
 
   PointAuthorization build({
     required PaymentIntent intent,
@@ -60,7 +62,11 @@ class PointAuthorizationService {
       payerAddress: payerAddress,
       pointAmount: pointAmount,
       typedData: {
-        'domain': {'name': 'MisePay PaymentIntent', 'version': '1'},
+        'domain': {
+          'name': 'MisePay PaymentIntent',
+          'version': '1',
+          'salt': domainSalt,
+        },
         'primaryType': 'PaymentIntentPointAuthorization',
         'types': {
           'PaymentIntentPointAuthorization': [
