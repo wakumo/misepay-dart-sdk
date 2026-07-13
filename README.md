@@ -27,15 +27,12 @@ dependencies:
 
 ## Usage
 
-Create a client with trusted app/build settings and fetch the PaymentIntent from the `requestUri` returned by MisePay checkout creation.
+Create a client and fetch the PaymentIntent from the `requestUri` returned by MisePay checkout creation. The default client uses the production MisePay origin and production EIP-712 domain salt.
 
 ```dart
 import 'package:misepay_sdk/misepay_sdk.dart';
 
-final client = MisePayClient(
-  allowedOrigins: {'https://apis.misepay.app'},
-  domainSalt: 'misepay:prod',
-);
+final client = MisePayClient();
 
 final paymentIntent = await client.paymentIntents.get(
   requestUri: requestUri,
@@ -43,7 +40,7 @@ final paymentIntent = await client.paymentIntents.get(
 );
 ```
 
-`allowedOrigins`, `allowAllOrigins`, and `domainSalt` must come from trusted app/build configuration, not from the request link or API response. Production builds should allow only the production MisePay origin. Dev builds may use permissive origin mode when needed:
+`allowedOrigins`, `allowAllOrigins`, and `domainSalt` are override settings. Do not read them from the request link or API response. Dev builds may use permissive origin mode when needed:
 
 ```dart
 final devClient = MisePayClient(

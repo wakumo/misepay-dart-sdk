@@ -7,6 +7,23 @@ import 'package:test/test.dart';
 
 void main() {
   group('MisePayClient.paymentIntents.get', () {
+    test('uses built-in production origin when no origin config is provided',
+        () async {
+      final requestedUris = <Uri>[];
+      final client = MisePayClient(
+        httpClient: MockClient((request) async {
+          requestedUris.add(request.url);
+          return _jsonResponse(_paymentIntentJson());
+        }),
+      );
+
+      await client.paymentIntents.get(
+        requestUri: 'https://apis.misepay.app/v1/payment-intents/pi_123',
+      );
+
+      expect(requestedUris.single.origin, 'https://apis.misepay.app');
+    });
+
     test('fetches requestUri as-is when payerAddress is omitted', () async {
       final requestedUris = <Uri>[];
       final client = MisePayClient(

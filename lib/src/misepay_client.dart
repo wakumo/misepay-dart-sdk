@@ -5,6 +5,9 @@ import 'payment_intents/domain/payment_intent_repository.dart';
 import 'payment_intents/payment_intents_client.dart';
 import 'payment_intents/services/point_authorization_service.dart';
 
+const _defaultAllowedOrigins = {'https://apis.misepay.app'};
+const _defaultDomainSalt = 'misepay:prod';
+
 /// Public facade for MisePay PaymentIntent checkout operations.
 class MisePayClient {
   /// Creates a client with an optional HTTP client or repository override.
@@ -14,9 +17,9 @@ class MisePayClient {
   MisePayClient({
     http.Client? httpClient,
     PaymentIntentRepository? paymentIntentRepository,
-    Set<String> allowedOrigins = const {},
+    Set<String> allowedOrigins = _defaultAllowedOrigins,
     bool allowAllOrigins = false,
-    String domainSalt = 'misepay:prod',
+    String domainSalt = _defaultDomainSalt,
   }) : paymentIntents = PaymentIntentsClient(
           repository: paymentIntentRepository ??
               PaymentIntentApi(
