@@ -89,8 +89,6 @@ void main() {
     test('rejects requestUri from untrusted origin before fetching', () async {
       final requestedUris = <Uri>[];
       final client = MisePayClient(
-        allowedOrigins: {'https://apis.misepay.app'},
-        domainSalt: 'misepay:prod',
         httpClient: MockClient((request) async {
           requestedUris.add(request.url);
           return _jsonResponse(_paymentIntentJson());
@@ -107,12 +105,12 @@ void main() {
       expect(requestedUris, isEmpty);
     });
 
-    test('allows any requestUri origin when allowAllOrigins is enabled',
+    test('allows any requestUri origin when originPolicy is allowAll',
         () async {
       final requestedUris = <Uri>[];
       final client = MisePayClient(
-        allowAllOrigins: true,
-        domainSalt: 'misepay:dev',
+        env: MisePayEnv.development,
+        originPolicy: MisePayOriginPolicy.allowAll,
         httpClient: MockClient((request) async {
           requestedUris.add(request.url);
           return _jsonResponse(_paymentIntentJson());
@@ -125,11 +123,29 @@ void main() {
 
       expect(requestedUris.single.origin, 'https://local-tunnel.example');
     });
+
+    test('uses custom allowed origins in development environment', () async {
+      final requestedUris = <Uri>[];
+      final client = MisePayClient(
+        env: MisePayEnv.development,
+        allowedOrigins: {'https://dev-apis.misepay.app'},
+        httpClient: MockClient((request) async {
+          requestedUris.add(request.url);
+          return _jsonResponse(_paymentIntentJson());
+        }),
+      );
+
+      await client.paymentIntents.get(
+        requestUri: 'https://dev-apis.misepay.app/v1/payment-intents/pi_123',
+      );
+
+      expect(requestedUris.single.origin, 'https://dev-apis.misepay.app');
+    });
   });
 
   group('PaymentIntentsClient.authorizePoints', () {
     test('builds PaymentIntentPointAuthorization typed data', () {
-      final client = MisePayClient(domainSalt: 'misepay:prod');
+      final client = MisePayClient();
       final intent =
           PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
 
@@ -153,6 +169,24 @@ void main() {
         'pointAmount': '2000000000000000000',
         'netAmount': '8500000000000000000',
         'expiresAt': 1783339500,
+      });
+    });
+
+    test('uses development salt for development environment', () {
+      final client = MisePayClient(env: MisePayEnv.development);
+      final intent =
+          PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
+
+      final authorization = client.paymentIntents.authorizePoints(
+        paymentIntent: intent,
+        paymentOption: intent.paymentOptions.single,
+        pointAmount: '2',
+      );
+
+      expect(authorization.typedData['domain'], {
+        'name': 'MisePay PaymentIntent',
+        'version': '1',
+        'salt': 'misepay:dev'
       });
     });
 

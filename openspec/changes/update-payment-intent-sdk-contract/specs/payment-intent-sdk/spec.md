@@ -2,14 +2,14 @@
 
 ### Requirement: Trusted Request URI Origins
 
-The SDK SHALL validate the origin of `requestUri` against built-in production defaults or trusted app/build override configuration before fetching a PaymentIntent, unless permissive origin mode is explicitly enabled by the integrating app.
+The SDK SHALL validate the origin of `requestUri` against built-in production defaults or trusted environment-specific app/build origin configuration before fetching a PaymentIntent, unless permissive origin mode is explicitly enabled by the integrating app.
 
 #### Scenario: Built-in production origin accepted
 - **WHEN** `MisePayClient()` fetches a `requestUri` from `https://apis.misepay.app`
 - **THEN** the SDK fetches the PaymentIntent without requiring app-provided origin configuration
 
-#### Scenario: Override origin accepted
-- **WHEN** `requestUri` has an origin in `allowedOrigins`
+#### Scenario: Development origin accepted
+- **WHEN** the SDK uses `MisePayEnv.development` and `requestUri` has an origin in `allowedOrigins`
 - **THEN** the SDK fetches the PaymentIntent
 
 #### Scenario: Untrusted origin rejected
@@ -22,15 +22,15 @@ The SDK SHALL validate the origin of `requestUri` against built-in production de
 
 ### Requirement: Environment-Separated Point Authorization Domain
 
-The SDK SHALL include the built-in production `salt` or trusted app/build configured override `salt` in the EIP-712 domain for point authorization typed data.
+The SDK SHALL include an EIP-712 domain `salt` derived from `MisePayEnv` for point authorization typed data, and SHALL NOT expose `domainSalt` as public app-provided configuration.
 
 #### Scenario: Built-in salt included in typed data
 - **WHEN** `MisePayClient()` builds a point authorization
 - **THEN** the typed data domain includes `salt: misepay:prod`
 
-#### Scenario: Override salt included in typed data
-- **WHEN** the app builds a point authorization
-- **THEN** the typed data domain includes the configured `salt`
+#### Scenario: Development salt included in typed data
+- **WHEN** the SDK uses `MisePayEnv.development` and builds a point authorization
+- **THEN** the typed data domain includes `salt: misepay:dev`
 
 ### Requirement: Nullable PaymentIntent Actions
 

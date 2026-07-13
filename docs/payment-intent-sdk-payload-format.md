@@ -48,7 +48,7 @@ await misepayClient.paymentIntents.provePayment(
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.
 - Point lookup is backend-resolved as `merchant_id + point_type + holder_address`.
 - Payment chain is not part of point identity.
-- EIP-712 domain `salt` defaults to the built-in production value. Override values must come from trusted app/build settings, not from the link or API response. Current values are `misepay:prod` for prod/stg and `misepay:dev` for dev.
+- EIP-712 domain `salt` is derived from the SDK environment, not from app input, the link, or the API response. Current values are `misepay:prod` for production and `misepay:dev` for development.
 - `authorizePoints` is local SDK logic and MUST NOT call a quote endpoint.
 - Any point amount change requires EIP-712 signature.
 - If current point amount is already `0`, cancellation is a no-op and should not submit.
@@ -151,31 +151,32 @@ await misepayClient.paymentIntents.provePayment(
 
 Action keys are stable, but values may be null when an action is unavailable for the current PaymentIntent state. SDK methods fail locally with `ACTION_UNAVAILABLE` when called for a null action.
 
-## SDK Origin And Domain Settings
+## SDK Environment And Origin Settings
 
 `MisePayClient()` includes built-in production defaults:
 
 ```txt
+environment = production
 allowedOrigins = { https://apis.misepay.app }
 domainSalt = misepay:prod
 ```
 
-Apps may override these values for controlled non-production builds:
+Apps may select development settings and provide trusted non-production origins:
 
 ```dart
 MisePayClient(
+  env: MisePayEnv.development,
   allowedOrigins: {'https://dev-apis.misepay.app'},
-  domainSalt: 'misepay:dev',
 );
 ```
 
-Dev builds may use permissive origin mode for local tunnels or temporary hosts, but should use the dev domain salt:
+Dev builds may use permissive origin mode for local tunnels or temporary hosts:
 
 ```dart
 MisePayClient(
-  allowAllOrigins: true,
-  domainSalt: 'misepay:dev',
+  env: MisePayEnv.development,
+  originPolicy: MisePayOriginPolicy.allowAll,
 );
 ```
 
-These settings are trusted app/build configuration. They must not be read from `request_uri`, query parameters, user input, or the PaymentIntent API response.
+These settings are trusted app/build configuration. They must not be read from `request_uri`, query parameters, user input, or the PaymentIntent API response. `domainSalt` is intentionally not public SDK configuration; it is derived from `MisePayEnv`.

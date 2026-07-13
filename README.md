@@ -40,12 +40,21 @@ final paymentIntent = await client.paymentIntents.get(
 );
 ```
 
-`allowedOrigins`, `allowAllOrigins`, and `domainSalt` are override settings. Do not read them from the request link or API response. Dev builds may use permissive origin mode when needed:
+Dev builds can select the development environment. The SDK derives the EIP-712 domain salt from the environment; app code does not supply `domainSalt`.
 
 ```dart
 final devClient = MisePayClient(
-  allowAllOrigins: true,
-  domainSalt: 'misepay:dev',
+  env: MisePayEnv.development,
+  allowedOrigins: {'https://dev-apis.misepay.app'},
+);
+```
+
+Local development can use a permissive origin policy when needed:
+
+```dart
+final localClient = MisePayClient(
+  env: MisePayEnv.development,
+  originPolicy: MisePayOriginPolicy.allowAll,
 );
 ```
 

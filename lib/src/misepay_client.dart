@@ -1,12 +1,10 @@
 import 'package:http/http.dart' as http;
 
+import 'misepay_environment.dart';
 import 'payment_intents/data/payment_intent_api.dart';
 import 'payment_intents/domain/payment_intent_repository.dart';
 import 'payment_intents/payment_intents_client.dart';
 import 'payment_intents/services/point_authorization_service.dart';
-
-const _defaultAllowedOrigins = {'https://apis.misepay.app'};
-const _defaultDomainSalt = 'misepay:prod';
 
 /// Public facade for MisePay PaymentIntent checkout operations.
 class MisePayClient {
@@ -17,18 +15,20 @@ class MisePayClient {
   MisePayClient({
     http.Client? httpClient,
     PaymentIntentRepository? paymentIntentRepository,
-    Set<String> allowedOrigins = _defaultAllowedOrigins,
-    bool allowAllOrigins = false,
-    String domainSalt = _defaultDomainSalt,
+    MisePayEnv env = MisePayEnv.production,
+    MisePayOriginPolicy originPolicy = MisePayOriginPolicy.allowListed,
+    Set<String> allowedOrigins = const {},
   }) : paymentIntents = PaymentIntentsClient(
           repository: paymentIntentRepository ??
               PaymentIntentApi(
                 httpClient: httpClient ?? http.Client(),
-                allowedOrigins: allowedOrigins,
-                allowAllOrigins: allowAllOrigins,
+                allowedOrigins: allowedOrigins.isEmpty
+                    ? env.defaultAllowedOrigins
+                    : allowedOrigins,
+                allowAllOrigins: originPolicy == MisePayOriginPolicy.allowAll,
               ),
           pointAuthorizationService:
-              PointAuthorizationService(domainSalt: domainSalt),
+              PointAuthorizationService(domainSalt: env.domainSalt),
         );
 
   /// PaymentIntent resource operations.
