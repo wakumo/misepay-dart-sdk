@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:misepay_sdk/misepay_sdk.dart';
+import 'package:misepay_sdk/src/payment_intents/services/point_authorization_service.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -160,7 +161,8 @@ void main() {
       expect(authorization.typedData['domain'], {
         'name': 'MisePay PaymentIntent',
         'version': '1',
-        'salt': 'misepay:prod'
+        'salt':
+            '0x934a72bcfc23658c976948324c105b63256b1fd78f220a1ac53fba14c85c8502'
       });
       expect(authorization.message, {
         'intentId': 'pi_123',
@@ -170,6 +172,33 @@ void main() {
         'netAmount': '8500000000000000000',
         'expiresAt': 1783339500,
       });
+    });
+
+    test('uses the current expected payment amount for net amount', () {
+      final client = MisePayClient();
+      final intent = PaymentIntent.fromJson(_paymentIntentJson(
+        payer: _payerJson(),
+        paymentOptionAmountBaseUnits: '7000000000000000000',
+      ));
+
+      final authorization = client.paymentIntents.authorizePoints(
+        paymentIntent: intent,
+        paymentOption: intent.paymentOptions.single,
+        pointAmount: '2',
+      );
+
+      expect(
+          authorization.message,
+          containsPair(
+            'grossAmount',
+            '10500000000000000000',
+          ));
+      expect(
+          authorization.message,
+          containsPair(
+            'netAmount',
+            '5000000000000000000',
+          ));
     });
 
     test('uses development salt for development environment', () {
@@ -186,7 +215,27 @@ void main() {
       expect(authorization.typedData['domain'], {
         'name': 'MisePay PaymentIntent',
         'version': '1',
-        'salt': 'misepay:dev'
+        'salt':
+            '0x956d16453a66b1c31ac6741fde6c1954711bc88cabafd92ef642c2a8ef219d9d'
+      });
+    });
+
+    test('hashes a custom domain salt label as Ethereum Keccak-256', () {
+      const service = PointAuthorizationService(domainSalt: 'misepay:test');
+      final intent =
+          PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
+
+      final authorization = service.build(
+        intent: intent,
+        paymentOption: intent.paymentOptions.single,
+        pointAmount: '2',
+      );
+
+      expect(authorization.typedData['domain'], {
+        'name': 'MisePay PaymentIntent',
+        'version': '1',
+        'salt':
+            '0xb6dce1b502f83af1b70625d604e6c7024247050c92d59830db9305b82da4ee9c'
       });
     });
 
@@ -243,7 +292,7 @@ void main() {
           pointAmount: '11',
         ),
         throwsA(isA<MisePayException>().having(
-            (error) => error.code, 'code', 'POINT_AMOUNT_EXCEEDS_GROSS')),
+            (error) => error.code, 'code', 'POINT_AMOUNT_EXCEEDS_REMAINING')),
       );
       expect(
         () => client.paymentIntents.authorizePoints(
@@ -263,6 +312,56 @@ void main() {
         throwsA(isA<MisePayException>()
             .having((error) => error.code, 'code', 'POINT_AMOUNT_UNCHANGED')),
       );
+    });
+
+    test('rejects points above the current expected payment', () {
+      final client = MisePayClient();
+      final intent = PaymentIntent.fromJson(_paymentIntentJson(
+        payer: _payerJson(includeLimits: false),
+        paymentOptionAmountBaseUnits: '1000000000000000000',
+      ));
+
+      expect(
+        () => client.paymentIntents.authorizePoints(
+          paymentIntent: intent,
+          paymentOption: intent.paymentOptions.single,
+          pointAmount: '2',
+        ),
+        throwsA(isA<MisePayException>().having(
+          (error) => error.code,
+          'code',
+          'POINT_AMOUNT_EXCEEDS_REMAINING',
+        )),
+      );
+    });
+
+    test('rejects invalid current expected payment amount formats', () {
+      final client = MisePayClient();
+      final malformedAmounts = ['invalid', '+10', '-0', '0x10', ''];
+      final actualCodes = <String, String>{};
+
+      for (final amountBaseUnits in malformedAmounts) {
+        final intent = PaymentIntent.fromJson(_paymentIntentJson(
+          payer: _payerJson(),
+          paymentOptionAmountBaseUnits: amountBaseUnits,
+        ));
+
+        try {
+          client.paymentIntents.authorizePoints(
+            paymentIntent: intent,
+            paymentOption: intent.paymentOptions.single,
+            pointAmount: '2',
+          );
+          actualCodes[amountBaseUnits] = 'returned normally';
+        } on MisePayException catch (error) {
+          actualCodes[amountBaseUnits] = error.code;
+        }
+      }
+
+      expect(actualCodes, {
+        for (final amountBaseUnits in malformedAmounts)
+          amountBaseUnits: 'INVALID_EXPECTED_PAYMENT_AMOUNT',
+      });
     });
 
     test('allows point authorization when limits are omitted', () {
@@ -474,6 +573,7 @@ Map<String, dynamic> _paymentIntentJson({
   Map<String, dynamic>? payer,
   Map<String, dynamic>? actions,
   String? chainName,
+  String paymentOptionAmountBaseUnits = '10500000000000000000',
 }) {
   final json = {
     'version': 1,
@@ -495,8 +595,7 @@ Map<String, dynamic> _paymentIntentJson({
         'asset_decimals': 18,
         'token_address': '0xJPYCPolygon',
         'recipient_address': '0xMerchantPolygon',
-        'amount_base_units':
-            payer == null ? '10500000000000000000' : '8500000000000000000',
+        'amount_base_units': paymentOptionAmountBaseUnits,
       },
     ],
     'actions': actions ??

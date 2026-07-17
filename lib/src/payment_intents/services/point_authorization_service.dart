@@ -1,3 +1,4 @@
+import '../../core/ethereum_keccak.dart';
 import '../../core/integer_string.dart';
 import '../../core/misepay_exception.dart';
 import '../domain/payment_intent.dart';
@@ -42,12 +43,14 @@ class PointAuthorizationService {
       throw MisePayException(
           'POINT_AMOUNT_UNCHANGED', 'Point amount is unchanged.');
     }
-    if (selectedPointAmount > grossAmount) {
-      throw MisePayException(
-          'POINT_AMOUNT_EXCEEDS_GROSS', 'Point amount exceeds gross amount.');
+    final currentExpectedAmount = parseNonNegativeIntegerString(
+        paymentOption.amountBaseUnits, 'INVALID_EXPECTED_PAYMENT_AMOUNT');
+    if (selectedPointAmount > currentExpectedAmount) {
+      throw MisePayException('POINT_AMOUNT_EXCEEDS_REMAINING',
+          'Point amount exceeds the current expected payment.');
     }
 
-    final netAmount = grossAmount - selectedPointAmount;
+    final netAmount = currentExpectedAmount - selectedPointAmount;
     final expiresAtSeconds = intent.expiresAt.millisecondsSinceEpoch ~/ 1000;
     final message = <String, Object>{
       'intentId': intent.id,
@@ -65,7 +68,7 @@ class PointAuthorizationService {
         'domain': {
           'name': 'MisePay PaymentIntent',
           'version': '1',
-          'salt': domainSalt,
+          'salt': ethereumKeccak256(domainSalt),
         },
         'primaryType': 'PaymentIntentPointAuthorization',
         'types': {
