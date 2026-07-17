@@ -48,7 +48,9 @@ await misepayClient.paymentIntents.provePayment(
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.
 - Point identity is backend-owned as `merchant_id + point_type + holder_address`. For the POC, `point_type` has a single backend default value. The SDK/app sends only `payerAddress`; it does not send or choose `point_type`.
 - Payment chain is not part of point identity.
-- EIP-712 domain `salt` is derived from the SDK environment, not from app input, the link, or the API response. Current values are `misepay:prod` for production and `misepay:dev` for development.
+- EIP-712 domain salt labels are derived from the SDK environment, not from app input, the link, or the API response. The configured labels are `misepay:prod` for production and `misepay:dev` for development. Before signing, `typedData.domain.salt` is set to `keccak256(UTF-8(label))` as a lowercase, `0x`-prefixed bytes32.
+- Each `payment_options[].amount_base_units` is the current expected token payment for that option and already accounts for verified payments.
+- The signed `netAmount` is `payment_options[].amount_base_units - selected point amount`, with both operands represented in the selected token's base units. The signed `grossAmount` remains the full gross order amount in those base units.
 - `authorizePoints` is local SDK logic and MUST NOT call a quote endpoint.
 - Any point amount change requires EIP-712 signature.
 - If current point amount is already `0`, cancellation is a no-op and should not submit.
@@ -67,15 +69,15 @@ await misepayClient.paymentIntents.provePayment(
     "point": {
       "label": "MisePay Points",
       "balance": { "available": "5000" },
-      "intent": { "amount": "1200" },
+      "intent": { "amount": "0" },
       "limits": { "max": "3000" }
     }
   },
   "amount": {
     "currency": "JPY",
     "gross": "3000",
-    "benefit": "1200",
-    "net": "1800"
+    "benefit": "0",
+    "net": "3000"
   },
   "payment_options": [
     {
@@ -96,6 +98,8 @@ await misepayClient.paymentIntents.provePayment(
 }
 ```
 
+This response represents a partial-payment state: `1200000000000000000000` token base units have already been verified on-chain, so the current expected payment in `payment_options[0].amount_base_units` is `1800000000000000000000` even though the full gross order amount remains `3000`.
+
 ## EIP-712 Typed Data
 
 ```json
@@ -103,7 +107,7 @@ await misepayClient.paymentIntents.provePayment(
   "domain": {
     "name": "MisePay PaymentIntent",
     "version": "1",
-    "salt": "misepay:prod"
+    "salt": "0x934a72bcfc23658c976948324c105b63256b1fd78f220a1ac53fba14c85c8502"
   },
   "primaryType": "PaymentIntentPointAuthorization",
   "types": {
@@ -119,13 +123,15 @@ await misepayClient.paymentIntents.provePayment(
   "message": {
     "intentId": "pi_123",
     "payer": "0xabc...",
-    "grossAmount": "3000",
-    "pointAmount": "1200",
-    "netAmount": "1800",
-    "expiresAt": 1780000300
+    "grossAmount": "3000000000000000000000",
+    "pointAmount": "1200000000000000000000",
+    "netAmount": "600000000000000000000",
+    "expiresAt": 1783339500
   }
 }
 ```
+
+Continuing the partial-payment example, the payer then selects `1200` points, which becomes `1200000000000000000000` token base units at 18 decimals. Subtracting that point selection from the current expected payment of `1800000000000000000000` produces the signed `netAmount` of `600000000000000000000`. The signed `grossAmount` stays at the full gross order amount of `3000000000000000000000`.
 
 ## Point Authorization Submit Body
 
@@ -158,7 +164,7 @@ Action keys are stable, but values may be null when an action is unavailable for
 ```txt
 environment = production
 allowedOrigins = { https://apis.misepay.app }
-domainSalt = misepay:prod
+domainSaltLabel = misepay:prod
 ```
 
 Apps may select development settings and provide trusted non-production origins:
@@ -179,4 +185,4 @@ MisePayClient(
 );
 ```
 
-These settings are trusted app/build configuration. They must not be read from `request_uri`, query parameters, user input, or the PaymentIntent API response. `domainSalt` is intentionally not public SDK configuration; it is derived from `MisePayEnv`.
+These settings are trusted app/build configuration. They must not be read from `request_uri`, query parameters, user input, or the PaymentIntent API response. `domainSalt` is intentionally not public SDK configuration; its label is derived from `MisePayEnv` and hashed with `keccak256(UTF-8(label))` before the typed data is signed.

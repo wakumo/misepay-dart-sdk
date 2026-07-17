@@ -46,7 +46,7 @@ class PointAuthorizationService {
     final currentExpectedAmount = parseNonNegativeIntegerString(
         paymentOption.amountBaseUnits, 'INVALID_EXPECTED_PAYMENT_AMOUNT');
     if (selectedPointAmount > currentExpectedAmount) {
-      throw MisePayException('POINT_AMOUNT_EXCEEDS_EXPECTED_PAYMENT',
+      throw MisePayException('POINT_AMOUNT_EXCEEDS_REMAINING',
           'Point amount exceeds the current expected payment.');
     }
 

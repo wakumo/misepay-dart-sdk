@@ -291,8 +291,8 @@ void main() {
           paymentOption: intent.paymentOptions.single,
           pointAmount: '11',
         ),
-        throwsA(isA<MisePayException>().having((error) => error.code, 'code',
-            'POINT_AMOUNT_EXCEEDS_EXPECTED_PAYMENT')),
+        throwsA(isA<MisePayException>().having(
+            (error) => error.code, 'code', 'POINT_AMOUNT_EXCEEDS_REMAINING')),
       );
       expect(
         () => client.paymentIntents.authorizePoints(
@@ -330,7 +330,7 @@ void main() {
         throwsA(isA<MisePayException>().having(
           (error) => error.code,
           'code',
-          'POINT_AMOUNT_EXCEEDS_EXPECTED_PAYMENT',
+          'POINT_AMOUNT_EXCEEDS_REMAINING',
         )),
       );
     });

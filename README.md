@@ -27,7 +27,7 @@ dependencies:
 
 ## Usage
 
-Create a client and fetch the PaymentIntent from the `requestUri` returned by MisePay checkout creation. The default client uses the production MisePay origin and production EIP-712 domain salt.
+Create a client and fetch the PaymentIntent from the `requestUri` returned by MisePay checkout creation. The default client uses the production MisePay origin and the configured production salt label, `misepay:prod`. Before signing, the SDK sets `typedData.domain.salt` to the lowercase, `0x`-prefixed bytes32 produced by `keccak256(UTF-8(label))`.
 
 ```dart
 import 'package:misepay_sdk/misepay_sdk.dart';
@@ -40,7 +40,7 @@ final paymentIntent = await client.paymentIntents.get(
 );
 ```
 
-Dev builds can select the development environment. The SDK derives the EIP-712 domain salt from the environment; app code does not supply `domainSalt`.
+Dev builds can select the development environment. The SDK derives the EIP-712 domain salt label (`misepay:prod` or `misepay:dev`) from `MisePayEnv`; app code does not supply `domainSalt`. The derived label is hashed before the typed data is signed.
 
 ```dart
 final devClient = MisePayClient(
@@ -101,6 +101,8 @@ final updatedIntent = await client.paymentIntents.applyPoints(
 
 `pointAmount` is a non-negative integer string. Money, points, and token base-unit amounts are represented as strings; do not convert them to floating point values.
 
+For point authorization, the selected payment option's `amountBaseUnits` is the current expected token payment and already accounts for verified payments. The SDK converts the selected `pointAmount` to token base units using that payment option's `assetDecimals`, then subtracts it from `amountBaseUnits` to produce the signed `netAmount`. The signed `grossAmount` remains the full gross order amount.
+
 ## Payment Proof
 
 After sending the on-chain payment, submit the transaction hash to the action URL returned by the PaymentIntent.
@@ -127,4 +129,4 @@ try {
 }
 ```
 
-Common SDK codes include `UNTRUSTED_REQUEST_ORIGIN`, `ACTION_UNAVAILABLE`, `HTTP_ERROR`, `UNKNOWN_STATUS`, `PAYER_REQUIRED`, `INVALID_POINT_AMOUNT`, `POINT_AMOUNT_EXCEEDS_MAX`, `POINT_AMOUNT_UNCHANGED`, and `POINT_AMOUNT_EXCEEDS_GROSS`. Backend machine-readable error codes are preserved when present.
+Common SDK codes include `UNTRUSTED_REQUEST_ORIGIN`, `ACTION_UNAVAILABLE`, `HTTP_ERROR`, `UNKNOWN_STATUS`, `PAYER_REQUIRED`, `INVALID_POINT_AMOUNT`, `INVALID_EXPECTED_PAYMENT_AMOUNT`, `POINT_AMOUNT_EXCEEDS_MAX`, `POINT_AMOUNT_UNCHANGED`, and `POINT_AMOUNT_EXCEEDS_REMAINING`. Backend machine-readable error codes are preserved when present.
