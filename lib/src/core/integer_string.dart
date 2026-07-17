@@ -1,12 +1,11 @@
 import 'misepay_exception.dart';
 
 BigInt parseNonNegativeIntegerString(String value, String errorCode) {
-  final parsed = BigInt.tryParse(value);
-  if (parsed == null || parsed < BigInt.zero) {
+  if (value.isEmpty || !_digitsOnly(value)) {
     throw MisePayException(
         errorCode, 'Expected a non-negative integer string.');
   }
-  return parsed;
+  return BigInt.parse(value);
 }
 
 BigInt parseNonNegativeDecimalUnits(
