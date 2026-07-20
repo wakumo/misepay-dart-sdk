@@ -174,21 +174,31 @@ void main() {
       });
     });
 
-    test('keeps JPY amounts separate from token base units', () {
+    test('preserves point units separately from 6-decimal JPYC base units', () {
       final client = MisePayClient();
       final intent = PaymentIntent.fromJson(_paymentIntentJson(
-        payer: _payerJson(),
-        paymentOptionAmountBaseUnits: '7000000000000000000',
+        payer: _payerJson(
+            intentAmount: '0', available: '500', includeLimits: false),
+        gross: '200',
+        benefit: '100',
+        net: '100',
+        assetDecimals: 6,
+        paymentOptionAmountBaseUnits: '100000000',
       ));
 
       final authorization = client.paymentIntents.authorizePoints(
         paymentIntent: intent,
         paymentOption: intent.paymentOptions.single,
-        pointAmount: '2',
+        pointAmount: '100',
       );
 
-      expect(authorization.message, containsPair('grossAmount', '10'));
-      expect(authorization.message, containsPair('netAmount', '8'));
+      expect(authorization.message, containsPair('grossAmount', '200'));
+      expect(authorization.message, containsPair('pointAmount', '100'));
+      expect(authorization.message, containsPair('netAmount', '100'));
+      expect(intent.paymentOptions.single.assetDecimals, 6);
+      expect(intent.paymentOptions.single.amountBaseUnits, '100000000');
+      expect(authorization.message.values, isNot(contains('100000000')));
+      expect(authorization.pointAmount, '100');
     });
 
     test('uses development salt for development environment', () {
@@ -265,15 +275,23 @@ void main() {
       final intent =
           PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
 
-      expect(
-        () => client.paymentIntents.authorizePoints(
-          paymentIntent: intent,
-          paymentOption: intent.paymentOptions.single,
-          pointAmount: '-1',
-        ),
-        throwsA(isA<MisePayException>()
-            .having((error) => error.code, 'code', 'INVALID_POINT_AMOUNT')),
-      );
+      for (final malformedPointAmount in [
+        '-1',
+        '100.0',
+        '1,000',
+        '+100',
+        ' 100'
+      ]) {
+        expect(
+          () => client.paymentIntents.authorizePoints(
+            paymentIntent: intent,
+            paymentOption: intent.paymentOptions.single,
+            pointAmount: malformedPointAmount,
+          ),
+          throwsA(isA<MisePayException>()
+              .having((error) => error.code, 'code', 'INVALID_POINT_AMOUNT')),
+        );
+      }
       expect(
         () => client.paymentIntents.authorizePoints(
           paymentIntent: PaymentIntent.fromJson(
@@ -371,6 +389,55 @@ void main() {
         'signature': '0xsig',
       });
       expect(updated.payer?.point.intent.amount, '2');
+    });
+
+    test('submits point authorization in point units for 6-decimal JPYC',
+        () async {
+      final requests = <http.Request>[];
+      final client = MisePayClient(
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          return _jsonResponse(_paymentIntentJson(
+            payer: _payerJson(
+                intentAmount: '100', available: '500', includeLimits: false),
+            gross: '200',
+            benefit: '100',
+            net: '100',
+            assetDecimals: 6,
+            paymentOptionAmountBaseUnits: '100000000',
+          ));
+        }),
+      );
+      final intent = PaymentIntent.fromJson(_paymentIntentJson(
+        payer: _payerJson(
+            intentAmount: '0', available: '500', includeLimits: false),
+        gross: '200',
+        benefit: '100',
+        net: '100',
+        assetDecimals: 6,
+        paymentOptionAmountBaseUnits: '100000000',
+      ));
+      final authorization = client.paymentIntents.authorizePoints(
+        paymentIntent: intent,
+        paymentOption: intent.paymentOptions.single,
+        pointAmount: '100',
+      );
+
+      final updated = await client.paymentIntents.applyPoints(
+        paymentIntent: intent,
+        authorization: authorization,
+        signature: '0xsig',
+      );
+
+      final payload = jsonDecode(requests.single.body) as Map<String, dynamic>;
+      expect(payload, {
+        'payer_address': '0xabc',
+        'point_amount': '100',
+        'signature': '0xsig',
+      });
+      expect(payload.values, isNot(contains('100000000')));
+      expect(updated.paymentOptions.single.amountBaseUnits, '100000000');
+      expect(updated.payer?.point.intent.amount, '100');
     });
 
     test('submits transaction hash to action URL', () async {
@@ -513,6 +580,10 @@ Map<String, dynamic> _paymentIntentJson({
   Map<String, dynamic>? payer,
   Map<String, dynamic>? actions,
   String? chainName,
+  String gross = '10',
+  String? benefit,
+  String? net,
+  int assetDecimals = 18,
   String paymentOptionAmountBaseUnits = '10500000000000000000',
 }) {
   final json = {
@@ -523,16 +594,16 @@ Map<String, dynamic> _paymentIntentJson({
     'store': {'name': 'Shibuya Store'},
     'amount': {
       'currency': 'JPY',
-      'gross': '10',
-      'benefit': payer == null ? '0' : '2',
-      'net': payer == null ? '10' : '8'
+      'gross': gross,
+      'benefit': benefit ?? (payer == null ? '0' : '2'),
+      'net': net ?? (payer == null ? gross : '8')
     },
     'payment_options': [
       {
         'chain_id': 137,
         if (chainName != null) 'chain_name': chainName,
         'asset_symbol': 'JPYC',
-        'asset_decimals': 18,
+        'asset_decimals': assetDecimals,
         'token_address': '0xJPYCPolygon',
         'recipient_address': '0xMerchantPolygon',
         'amount_base_units': paymentOptionAmountBaseUnits,
