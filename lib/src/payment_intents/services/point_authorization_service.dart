@@ -22,18 +22,16 @@ class PointAuthorizationService {
           'Payer context is required to build point authorization.');
     }
 
-    final selectedPointAmount = parseNonNegativeDecimalUnits(
-        pointAmount, paymentOption.assetDecimals, 'INVALID_POINT_AMOUNT');
-    final currentPointAmount = parseNonNegativeDecimalUnits(
-        payer!.point.intent.amount,
-        paymentOption.assetDecimals,
-        'INVALID_CURRENT_POINT_AMOUNT');
+    final selectedPointAmount =
+        parseNonNegativeIntegerString(pointAmount, 'INVALID_POINT_AMOUNT');
+    final currentPointAmount = parseNonNegativeIntegerString(
+        payer!.point.intent.amount, 'INVALID_CURRENT_POINT_AMOUNT');
     final maxPointAmount = payer.point.limits?.max == null
         ? null
-        : parseNonNegativeDecimalUnits(payer.point.limits!.max,
-            paymentOption.assetDecimals, 'INVALID_POINT_LIMIT');
-    final grossAmount = parseNonNegativeDecimalUnits(intent.amount.gross,
-        paymentOption.assetDecimals, 'INVALID_GROSS_AMOUNT');
+        : parseNonNegativeIntegerString(
+            payer.point.limits!.max, 'INVALID_POINT_LIMIT');
+    final grossAmount = parseNonNegativeIntegerString(
+        intent.amount.gross, 'INVALID_GROSS_AMOUNT');
 
     if (maxPointAmount != null && selectedPointAmount > maxPointAmount) {
       throw MisePayException('POINT_AMOUNT_EXCEEDS_MAX',
@@ -43,14 +41,12 @@ class PointAuthorizationService {
       throw MisePayException(
           'POINT_AMOUNT_UNCHANGED', 'Point amount is unchanged.');
     }
-    final currentExpectedAmount = parseNonNegativeIntegerString(
-        paymentOption.amountBaseUnits, 'INVALID_EXPECTED_PAYMENT_AMOUNT');
-    if (selectedPointAmount > currentExpectedAmount) {
-      throw MisePayException('POINT_AMOUNT_EXCEEDS_REMAINING',
-          'Point amount exceeds the current expected payment.');
+    if (selectedPointAmount > grossAmount) {
+      throw MisePayException(
+          'POINT_AMOUNT_EXCEEDS_GROSS', 'Point amount exceeds gross amount.');
     }
 
-    final netAmount = currentExpectedAmount - selectedPointAmount;
+    final netAmount = grossAmount - selectedPointAmount;
     final expiresAtSeconds = intent.expiresAt.millisecondsSinceEpoch ~/ 1000;
     final message = <String, Object>{
       'intentId': intent.id,
