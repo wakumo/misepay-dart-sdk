@@ -99,9 +99,9 @@ final updatedIntent = await client.paymentIntents.applyPoints(
 );
 ```
 
-`pointAmount` is a non-negative integer string. Money, points, and token base-unit amounts are represented as strings; do not convert them to floating point values.
+`pointAmount` is a non-negative integer string where `1 point = 1 JPY`. Money, points, and token base-unit amounts are represented as strings; do not convert them to floating point values.
 
-For point authorization, the selected payment option's `amountBaseUnits` is the current expected token payment and already accounts for verified payments. The SDK converts the selected `pointAmount` to token base units using that payment option's `assetDecimals`, then subtracts it from `amountBaseUnits` to produce the signed `netAmount`. The signed `grossAmount` remains the full gross order amount.
+For point authorization, the signed `grossAmount`, `pointAmount`, and `netAmount` remain integer JPY-value units. Token decimal conversion applies only to the selected payment option's `amountBaseUnits`.
 
 ## Payment Proof
 

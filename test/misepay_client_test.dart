@@ -167,14 +167,14 @@ void main() {
       expect(authorization.message, {
         'intentId': 'pi_123',
         'payer': '0xabc',
-        'grossAmount': '10500000000000000000',
-        'pointAmount': '2000000000000000000',
-        'netAmount': '8500000000000000000',
+        'grossAmount': '10',
+        'pointAmount': '2',
+        'netAmount': '8',
         'expiresAt': 1783339500,
       });
     });
 
-    test('uses the current expected payment amount for net amount', () {
+    test('keeps JPY amounts separate from token base units', () {
       final client = MisePayClient();
       final intent = PaymentIntent.fromJson(_paymentIntentJson(
         payer: _payerJson(),
@@ -187,18 +187,8 @@ void main() {
         pointAmount: '2',
       );
 
-      expect(
-          authorization.message,
-          containsPair(
-            'grossAmount',
-            '10500000000000000000',
-          ));
-      expect(
-          authorization.message,
-          containsPair(
-            'netAmount',
-            '5000000000000000000',
-          ));
+      expect(authorization.message, containsPair('grossAmount', '10'));
+      expect(authorization.message, containsPair('netAmount', '8'));
     });
 
     test('uses development salt for development environment', () {
@@ -292,7 +282,7 @@ void main() {
           pointAmount: '11',
         ),
         throwsA(isA<MisePayException>().having(
-            (error) => error.code, 'code', 'POINT_AMOUNT_EXCEEDS_REMAINING')),
+            (error) => error.code, 'code', 'POINT_AMOUNT_EXCEEDS_GROSS')),
       );
       expect(
         () => client.paymentIntents.authorizePoints(
@@ -312,56 +302,6 @@ void main() {
         throwsA(isA<MisePayException>()
             .having((error) => error.code, 'code', 'POINT_AMOUNT_UNCHANGED')),
       );
-    });
-
-    test('rejects points above the current expected payment', () {
-      final client = MisePayClient();
-      final intent = PaymentIntent.fromJson(_paymentIntentJson(
-        payer: _payerJson(includeLimits: false),
-        paymentOptionAmountBaseUnits: '1000000000000000000',
-      ));
-
-      expect(
-        () => client.paymentIntents.authorizePoints(
-          paymentIntent: intent,
-          paymentOption: intent.paymentOptions.single,
-          pointAmount: '2',
-        ),
-        throwsA(isA<MisePayException>().having(
-          (error) => error.code,
-          'code',
-          'POINT_AMOUNT_EXCEEDS_REMAINING',
-        )),
-      );
-    });
-
-    test('rejects invalid current expected payment amount formats', () {
-      final client = MisePayClient();
-      final malformedAmounts = ['invalid', '+10', '-0', '0x10', ''];
-      final actualCodes = <String, String>{};
-
-      for (final amountBaseUnits in malformedAmounts) {
-        final intent = PaymentIntent.fromJson(_paymentIntentJson(
-          payer: _payerJson(),
-          paymentOptionAmountBaseUnits: amountBaseUnits,
-        ));
-
-        try {
-          client.paymentIntents.authorizePoints(
-            paymentIntent: intent,
-            paymentOption: intent.paymentOptions.single,
-            pointAmount: '2',
-          );
-          actualCodes[amountBaseUnits] = 'returned normally';
-        } on MisePayException catch (error) {
-          actualCodes[amountBaseUnits] = error.code;
-        }
-      }
-
-      expect(actualCodes, {
-        for (final amountBaseUnits in malformedAmounts)
-          amountBaseUnits: 'INVALID_EXPECTED_PAYMENT_AMOUNT',
-      });
     });
 
     test('allows point authorization when limits are omitted', () {
@@ -583,9 +523,9 @@ Map<String, dynamic> _paymentIntentJson({
     'store': {'name': 'Shibuya Store'},
     'amount': {
       'currency': 'JPY',
-      'gross': '10.5',
+      'gross': '10',
       'benefit': payer == null ? '0' : '2',
-      'net': payer == null ? '10.5' : '8.5'
+      'net': payer == null ? '10' : '8'
     },
     'payment_options': [
       {
@@ -625,6 +565,6 @@ Map<String, dynamic> _payerJson({
         'label': 'MisePay Points',
         'balance': {'available': available},
         'intent': {'amount': intentAmount},
-        if (includeLimits) 'limits': {'max': '10.5'},
+        if (includeLimits) 'limits': {'max': '10'},
       },
     };
