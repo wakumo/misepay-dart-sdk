@@ -1,6 +1,5 @@
 import 'domain/payment_intent.dart';
 import 'domain/payment_intent_repository.dart';
-import 'domain/payment_option.dart';
 import 'domain/point_authorization.dart';
 import 'services/point_authorization_service.dart';
 
@@ -34,16 +33,14 @@ class PaymentIntentsClient {
   /// Builds EIP-712 point authorization typed data for [paymentIntent].
   ///
   /// [pointAmount] must be a non-negative integer string. The full
-  /// [paymentIntent] is required because validation uses payer, gross amount,
-  /// point limits, current point selection, and expiry data.
+  /// [paymentIntent] is required because validation uses payer, point limits,
+  /// current point selection, and expiry data.
   PointAuthorization authorizePoints({
     required PaymentIntent paymentIntent,
-    required PaymentOption paymentOption,
     required String pointAmount,
   }) {
     return _pointAuthorizationService.build(
       intent: paymentIntent,
-      paymentOption: paymentOption,
       pointAmount: pointAmount,
     );
   }
