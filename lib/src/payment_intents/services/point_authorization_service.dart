@@ -2,7 +2,6 @@ import '../../core/ethereum_keccak.dart';
 import '../../core/integer_string.dart';
 import '../../core/misepay_exception.dart';
 import '../domain/payment_intent.dart';
-import '../domain/payment_option.dart';
 import '../domain/point_authorization.dart';
 
 class PointAuthorizationService {
@@ -12,7 +11,6 @@ class PointAuthorizationService {
 
   PointAuthorization build({
     required PaymentIntent intent,
-    required PaymentOption paymentOption,
     required String pointAmount,
   }) {
     final payer = intent.payer;
@@ -30,8 +28,6 @@ class PointAuthorizationService {
         ? null
         : parseNonNegativeIntegerString(
             payer.point.limits!.max, 'INVALID_POINT_LIMIT');
-    final grossAmount = parseNonNegativeIntegerString(
-        intent.amount.gross, 'INVALID_GROSS_AMOUNT');
 
     if (maxPointAmount != null && selectedPointAmount > maxPointAmount) {
       throw MisePayException('POINT_AMOUNT_EXCEEDS_MAX',
@@ -41,19 +37,12 @@ class PointAuthorizationService {
       throw MisePayException(
           'POINT_AMOUNT_UNCHANGED', 'Point amount is unchanged.');
     }
-    if (selectedPointAmount > grossAmount) {
-      throw MisePayException(
-          'POINT_AMOUNT_EXCEEDS_GROSS', 'Point amount exceeds gross amount.');
-    }
 
-    final netAmount = grossAmount - selectedPointAmount;
     final expiresAtSeconds = intent.expiresAt.millisecondsSinceEpoch ~/ 1000;
     final message = <String, Object>{
       'intentId': intent.id,
       'payer': payerAddress,
-      'grossAmount': grossAmount.toString(),
       'pointAmount': selectedPointAmount.toString(),
-      'netAmount': netAmount.toString(),
       'expiresAt': expiresAtSeconds,
     };
 
@@ -71,9 +60,7 @@ class PointAuthorizationService {
           'PaymentIntentPointAuthorization': [
             {'name': 'intentId', 'type': 'string'},
             {'name': 'payer', 'type': 'address'},
-            {'name': 'grossAmount', 'type': 'uint256'},
             {'name': 'pointAmount', 'type': 'uint256'},
-            {'name': 'netAmount', 'type': 'uint256'},
             {'name': 'expiresAt', 'type': 'uint256'},
           ],
         },

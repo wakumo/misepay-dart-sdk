@@ -80,12 +80,11 @@ final json = paymentIntent.toJson();
 
 ## Point Authorization
 
-When the payer wants to apply points, build EIP-712 typed data from the full `PaymentIntent`. The full object is required because validation depends on payer, amount, limits, and expiry data.
+When the payer wants to apply points, build EIP-712 typed data from the full `PaymentIntent`. The full object supplies the intent ID, payer, point limits, current point selection, and expiry. Point authorization is independent of the selected chain or payment option.
 
 ```dart
 final authorization = client.paymentIntents.authorizePoints(
   paymentIntent: paymentIntent,
-  paymentOption: paymentIntent.paymentOptions.first,
   pointAmount: '1200',
 );
 
@@ -99,9 +98,15 @@ final updatedIntent = await client.paymentIntents.applyPoints(
 );
 ```
 
-`pointAmount` is a non-negative integer string where `1 point = 1 JPY`. Money, points, and token base-unit amounts are represented as strings; do not convert them to floating point values.
+The V1 EIP-712 message signs exactly `intentId`, `payer`, `pointAmount`, and `expiresAt`. The domain remains version `1`; the unreleased earlier message shape is not supported as a fallback.
 
-For point authorization, the signed `grossAmount`, `pointAmount`, and `netAmount` remain integer JPY-value units. Token decimal conversion applies only to the selected payment option's `amountBaseUnits`.
+Keep these unit domains separate:
+
+- `pointAmount` is a non-negative integer point value where `1 point = 1 JPY`; it is never scaled using token decimals.
+- `paymentIntent.amount.gross`, `benefit`, and `net` are backend-derived display/accounting values.
+- Each payment option's `amountBaseUnits` is an exact settlement-token quantity scaled by that asset's decimals.
+
+The backend locks current PaymentIntent state and recomputes remaining value, balance, benefit, net amount, and settlement base units when the signed authorization is submitted. Do not convert any of these string values to floating point.
 
 ## Payment Proof
 
