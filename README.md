@@ -98,11 +98,17 @@ final updatedIntent = await client.paymentIntents.applyPoints(
 );
 ```
 
+An open checkout remains `PaymentIntentStatus.pending` after partial point
+application. Replace local checkout state with `updatedIntent`, then send the
+selected payment option's exact `amountBaseUnits` when `updatedIntent.status`
+is `pending`. If it is `completed`, show success and do not send a token
+transaction.
+
 The V1 EIP-712 message signs exactly `intentId`, `payer`, `pointAmount`, and `expiresAt`. The domain remains version `1`; the unreleased earlier message shape is not supported as a fallback.
 
 Keep these unit domains separate:
 
-- `pointAmount` is a non-negative integer point value where `1 point = 1 JPY`; it is never scaled using token decimals.
+- `pointAmount` is a positive integer point value where `1 point = 1 JPY`; it is never scaled using token decimals.
 - `paymentIntent.amount.gross`, `benefit`, and `net` are backend-derived display/accounting values.
 - Each payment option's `amountBaseUnits` is an exact settlement-token quantity scaled by that asset's decimals.
 

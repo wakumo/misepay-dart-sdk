@@ -288,6 +288,7 @@ void main() {
           PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
 
       for (final malformedPointAmount in [
+        '0',
         '-1',
         '100.0',
         '1,000',
@@ -394,6 +395,7 @@ void main() {
         'signature': '0xsig',
       });
       expect(updated.payer?.point.intent.amount, '2');
+      expect(updated.status, PaymentIntentStatus.pending);
     });
 
     test('submits point authorization in point units for 6-decimal JPYC',
@@ -451,7 +453,7 @@ void main() {
           requests.add(request);
           return _jsonResponse({
             ..._paymentIntentJson(payer: _payerJson()),
-            'status': 'requires_payment'
+            'status': 'pending'
           });
         }),
       );
@@ -472,7 +474,7 @@ void main() {
         'token_address': '0xJPYCPolygon',
         'tx_hash': '0xtx',
       });
-      expect(updated.status, PaymentIntentStatus.requiresPayment);
+      expect(updated.status, PaymentIntentStatus.pending);
     });
 
     test('fails locally when point authorization action is unavailable',
