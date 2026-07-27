@@ -127,6 +127,14 @@ final paidIntent = await client.paymentIntents.provePayment(
 );
 ```
 
+The backend independently verifies the configured chain, token contract,
+successful receipt, confirmation depth, recipient, and exact token base-unit
+amount. A `202 Accepted` response returns the current `pending` PaymentIntent
+while normal scanning continues; a `200 OK` response may return the completed
+PaymentIntent immediately. Replace local checkout state with either response.
+Retries are safe, but a transaction already linked to another payment is
+reported with the backend `PAYMENT_PROOF_TRANSACTION_ALREADY_USED` code.
+
 ## Errors
 
 SDK validation and HTTP errors throw `MisePayException`:

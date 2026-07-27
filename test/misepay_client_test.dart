@@ -451,10 +451,10 @@ void main() {
       final client = MisePayClient(
         httpClient: MockClient((request) async {
           requests.add(request);
-          return _jsonResponse({
-            ..._paymentIntentJson(payer: _payerJson()),
-            'status': 'pending'
-          });
+          return _jsonResponse(
+            {..._paymentIntentJson(payer: _payerJson()), 'status': 'pending'},
+            statusCode: 202,
+          );
         }),
       );
       final intent =
@@ -475,6 +475,60 @@ void main() {
         'tx_hash': '0xtx',
       });
       expect(updated.status, PaymentIntentStatus.pending);
+    });
+
+    test('accepts a completed payment proof response', () async {
+      final client = MisePayClient(
+        httpClient: MockClient((request) async {
+          return _jsonResponse({
+            ..._paymentIntentJson(payer: _payerJson()),
+            'status': 'completed'
+          });
+        }),
+      );
+      final intent =
+          PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
+
+      final updated = await client.paymentIntents.provePayment(
+        paymentIntent: intent,
+        chainId: 137,
+        tokenAddress: '0xJPYCPolygon',
+        txHash: '0xtx',
+      );
+
+      expect(updated.status, PaymentIntentStatus.completed);
+    });
+
+    test('preserves payment proof reuse errors from the backend', () async {
+      final client = MisePayClient(
+        httpClient: MockClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'statusCode': 409,
+              'message': 'PAYMENT_PROOF_TRANSACTION_ALREADY_USED',
+              'error': 'Conflict',
+            }),
+            409,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+      final intent =
+          PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
+
+      await expectLater(
+        client.paymentIntents.provePayment(
+          paymentIntent: intent,
+          chainId: 137,
+          tokenAddress: '0xJPYCPolygon',
+          txHash: '0xtx',
+        ),
+        throwsA(isA<MisePayException>().having(
+          (error) => error.code,
+          'code',
+          'PAYMENT_PROOF_TRANSACTION_ALREADY_USED',
+        )),
+      );
     });
 
     test('fails locally when point authorization action is unavailable',
@@ -574,9 +628,11 @@ void main() {
   });
 }
 
-http.Response _jsonResponse(Map<String, dynamic> json) => http.Response(
+http.Response _jsonResponse(Map<String, dynamic> json,
+        {int statusCode = 200}) =>
+    http.Response(
       jsonEncode(json),
-      200,
+      statusCode,
       headers: {'content-type': 'application/json'},
     );
 
