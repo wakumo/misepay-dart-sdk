@@ -22,6 +22,10 @@ class PointAuthorizationService {
 
     final selectedPointAmount =
         parseNonNegativeIntegerString(pointAmount, 'INVALID_POINT_AMOUNT');
+    if (selectedPointAmount <= BigInt.zero) {
+      throw MisePayException(
+          'INVALID_POINT_AMOUNT', 'Point amount must be positive.');
+    }
     final currentPointAmount = parseNonNegativeIntegerString(
         payer!.point.intent.amount, 'INVALID_CURRENT_POINT_AMOUNT');
     final maxPointAmount = payer.point.limits?.max == null

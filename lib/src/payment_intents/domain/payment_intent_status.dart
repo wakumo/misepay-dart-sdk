@@ -3,7 +3,6 @@ import '../../core/misepay_exception.dart';
 /// PaymentIntent lifecycle status.
 enum PaymentIntentStatus {
   pending('pending'),
-  requiresPayment('requires_payment'),
   completed('completed'),
   expired('expired'),
   cancelled('cancelled'),
