@@ -22,9 +22,24 @@ Map<String, dynamic> parseJsonObjectResponse(http.Response response) {
       if (code is String && code.isNotEmpty) {
         return (code, message is String ? message : null);
       }
+      if (message is String && _isMachineReadableCode(message)) {
+        return (message, message);
+      }
+      if (message is List) {
+        final validationCode = message.whereType<String>().firstWhere(
+              _isMachineReadableCode,
+              orElse: () => '',
+            );
+        if (validationCode.isNotEmpty) {
+          return (validationCode, validationCode);
+        }
+      }
     }
   } on FormatException {
     return ('HTTP_ERROR', null);
   }
   return ('HTTP_ERROR', null);
 }
+
+bool _isMachineReadableCode(String value) =>
+    RegExp(r'^[A-Z][A-Z0-9_]+$').hasMatch(value);
