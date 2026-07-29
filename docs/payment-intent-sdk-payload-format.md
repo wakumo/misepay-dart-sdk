@@ -39,12 +39,15 @@ await misepayClient.paymentIntents.provePayment(
 
 ## Key Rules
 
-- `requestUri` is the initial GET URL.
+- Checkout creation returns `{ order, payment_intent }`; the initial GET URL is `payment_intent.request_uri`, exposed by the SDK as `PaymentIntent.requestUri`.
+- `request_uri` is required on every version 1 PaymentIntent response, including polling, terminal, point-authorization, and payment-proof responses.
+- Apps MUST reuse the returned `PaymentIntent.requestUri` and MUST NOT construct a route from `PaymentIntent.id`.
 - The SDK validates the `requestUri` origin against built-in production settings unless trusted override settings or permissive origin mode are provided.
 - The SDK validates origin only, not path. The backend route remains opaque to the SDK.
 - If `payerAddress` is provided, the SDK appends `payer_address` to the initial GET URL.
 - Follow-up API calls MUST use response `actions` URLs.
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.
+- The SDK accepts PaymentIntent payload version `1` and rejects any other version with `UNSUPPORTED_PAYMENT_INTENT_VERSION` before using payment instructions or actions.
 - Point identity is backend-owned as `merchant_id + point_type + holder_address`. For the POC, `point_type` has a single backend default value. The SDK/app sends only `payerAddress`; it does not send or choose `point_type`.
 - Payment chain is not part of point identity.
 - EIP-712 domain salt labels are derived from the SDK environment, not from app input, the link, or the API response. The configured labels are `misepay:prod` for production and `misepay:dev` for development. Before signing, `typedData.domain.salt` is set to `keccak256(UTF-8(label))` as a lowercase, `0x`-prefixed bytes32.
@@ -61,10 +64,51 @@ await misepayClient.paymentIntents.provePayment(
 
 ## PaymentIntent Response Shape
 
+Without `payerAddress`, the canonical resource explicitly contains
+`"payer": null`:
+
 ```json
 {
   "version": 1,
   "id": "pi_123",
+  "request_uri": "https://api.misepay.app/v1/payment-intents/pi_123",
+  "status": "pending",
+  "merchant": { "name": "Cafe ABC" },
+  "store": { "name": "Shibuya Store" },
+  "payer": null,
+  "amount": {
+    "currency": "JPY",
+    "gross": "3000",
+    "benefit": "0",
+    "net": "3000"
+  },
+  "payment_options": [
+    {
+      "chain_id": 137,
+      "chain_name": "Polygon",
+      "asset_symbol": "JPYC",
+      "asset_decimals": 18,
+      "token_address": "0xJPYCPolygon...",
+      "recipient_address": "0xMerchantPolygon...",
+      "amount_base_units": "3000000000000000000000"
+    }
+  ],
+  "actions": {
+    "submit_point_authorization": "https://api.misepay.app/v1/payment-intents/pi_123/benefits",
+    "submit_payment_proof": "https://api.misepay.app/v1/payment-intents/pi_123/payment-proofs"
+  },
+  "expires_at": "2026-07-06T12:05:00Z"
+}
+```
+
+With `payerAddress`, the same resource contains the payer-specific point
+balance and authorization values:
+
+```json
+{
+  "version": 1,
+  "id": "pi_123",
+  "request_uri": "https://api.misepay.app/v1/payment-intents/pi_123",
   "status": "pending",
   "merchant": { "name": "Cafe ABC" },
   "store": { "name": "Shibuya Store" },
@@ -73,8 +117,10 @@ await misepayClient.paymentIntents.provePayment(
     "point": {
       "label": "MisePay Points",
       "balance": { "available": "5000" },
-      "intent": { "amount": "0" },
-      "limits": { "max": "3000" }
+      "authorization": {
+        "amount": "0",
+        "max_amount": "3000"
+      }
     }
   },
   "amount": {
@@ -103,6 +149,18 @@ await misepayClient.paymentIntents.provePayment(
 ```
 
 This response represents a partial-payment state: `1200000000000000000000` token base units have already been verified on-chain, so the current expected payment in `payment_options[0].amount_base_units` is `1800000000000000000000` even though the full gross order amount remains `3000`.
+
+The SDK exposes `authorization.amount` as a string and `authorization.max_amount`
+as `authorization.maxAmount`. Both fields are required whenever `payer` is not
+null. The maximum is the total authorization target for the current snapshot,
+not an incremental allowance. Internal `reserved`, `consumed`, and `released`
+benefit statuses remain backend-only.
+
+Initial fetches, polling responses, and action responses use this same resource
+shape. Replace local state with each returned PaymentIntent and use its
+`requestUri` for the next poll. When the backend creates a replacement intent
+after expiry, use the replacement resource's new `requestUri` to generate the
+new QR; do not reuse the expired URI.
 
 ## EIP-712 Typed Data
 

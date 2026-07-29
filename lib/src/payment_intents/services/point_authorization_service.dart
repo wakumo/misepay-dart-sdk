@@ -27,13 +27,11 @@ class PointAuthorizationService {
           'INVALID_POINT_AMOUNT', 'Point amount must be positive.');
     }
     final currentPointAmount = parseNonNegativeIntegerString(
-        payer!.point.intent.amount, 'INVALID_CURRENT_POINT_AMOUNT');
-    final maxPointAmount = payer.point.limits?.max == null
-        ? null
-        : parseNonNegativeIntegerString(
-            payer.point.limits!.max, 'INVALID_POINT_LIMIT');
+        payer!.point.authorization.amount, 'INVALID_CURRENT_POINT_AMOUNT');
+    final maxPointAmount = parseNonNegativeIntegerString(
+        payer.point.authorization.maxAmount, 'INVALID_POINT_LIMIT');
 
-    if (maxPointAmount != null && selectedPointAmount > maxPointAmount) {
+    if (selectedPointAmount > maxPointAmount) {
       throw MisePayException('POINT_AMOUNT_EXCEEDS_MAX',
           'Point amount exceeds maximum selectable amount.');
     }

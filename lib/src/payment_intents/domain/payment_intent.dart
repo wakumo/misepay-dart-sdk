@@ -1,3 +1,4 @@
+import '../../core/misepay_exception.dart';
 import 'amount_summary.dart';
 import 'merchant.dart';
 import 'payer.dart';
@@ -12,6 +13,7 @@ class PaymentIntent {
   const PaymentIntent({
     required this.version,
     required this.id,
+    required this.requestUri,
     required this.status,
     required this.merchant,
     required this.store,
@@ -24,9 +26,18 @@ class PaymentIntent {
 
   /// Parses a PaymentIntent from API JSON.
   factory PaymentIntent.fromJson(Map<String, dynamic> json) {
+    final version = json['version'] as int;
+    if (version != 1) {
+      throw MisePayException(
+        'UNSUPPORTED_PAYMENT_INTENT_VERSION',
+        'Unsupported PaymentIntent version: $version',
+      );
+    }
+
     return PaymentIntent(
-      version: json['version'] as int,
+      version: version,
       id: json['id'] as String,
+      requestUri: json['request_uri'] as String,
       status: PaymentIntentStatus.fromJson(json['status'] as String),
       merchant: Merchant.fromJson(json['merchant'] as Map<String, dynamic>),
       store: Store.fromJson(json['store'] as Map<String, dynamic>),
@@ -49,6 +60,9 @@ class PaymentIntent {
 
   /// PaymentIntent identifier.
   final String id;
+
+  /// Canonical backend URI for fetching this exact PaymentIntent.
+  final String requestUri;
 
   /// Current PaymentIntent status.
   final PaymentIntentStatus status;
@@ -79,6 +93,7 @@ class PaymentIntent {
     return {
       'version': version,
       'id': id,
+      'request_uri': requestUri,
       'status': status.toJson(),
       'merchant': merchant.toJson(),
       'store': store.toJson(),
@@ -87,7 +102,7 @@ class PaymentIntent {
           paymentOptions.map((option) => option.toJson()).toList(),
       'actions': actions.toJson(),
       'expires_at': _formatUtcTimestamp(expiresAt),
-      if (payer != null) 'payer': payer!.toJson(),
+      'payer': payer?.toJson(),
     };
   }
 }
