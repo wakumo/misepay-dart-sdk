@@ -44,7 +44,7 @@ class PaymentIntentApi implements PaymentIntentRepository {
           'ACTION_UNAVAILABLE', 'Point authorization action is unavailable.');
     }
     final response = await _httpClient.post(
-      Uri.parse(actionUrl),
+      _buildTrustedUri(actionUrl),
       headers: {'content-type': 'application/json'},
       body: pointAuthorizationPayload(
         authorization: authorization,
@@ -67,7 +67,7 @@ class PaymentIntentApi implements PaymentIntentRepository {
           'ACTION_UNAVAILABLE', 'Payment proof action is unavailable.');
     }
     final response = await _httpClient.post(
-      Uri.parse(actionUrl),
+      _buildTrustedUri(actionUrl),
       headers: {'content-type': 'application/json'},
       body: paymentProofPayload(
         chainId: chainId,
@@ -79,11 +79,7 @@ class PaymentIntentApi implements PaymentIntentRepository {
   }
 
   Uri _buildRequestUri({required String requestUri, String? payerAddress}) {
-    final uri = Uri.parse(requestUri);
-    if (!_allowAllOrigins && !_allowedOrigins.contains(uri.origin)) {
-      throw MisePayException('UNTRUSTED_REQUEST_ORIGIN',
-          'PaymentIntent requestUri origin is not trusted.');
-    }
+    final uri = _buildTrustedUri(requestUri);
     if (payerAddress == null) {
       return uri;
     }
@@ -91,5 +87,14 @@ class PaymentIntentApi implements PaymentIntentRepository {
       ...uri.queryParameters,
       'payer_address': payerAddress,
     });
+  }
+
+  Uri _buildTrustedUri(String value) {
+    final uri = Uri.parse(value);
+    if (!_allowAllOrigins && !_allowedOrigins.contains(uri.origin)) {
+      throw MisePayException('UNTRUSTED_REQUEST_ORIGIN',
+          'PaymentIntent URL origin is not trusted.');
+    }
+    return uri;
   }
 }
