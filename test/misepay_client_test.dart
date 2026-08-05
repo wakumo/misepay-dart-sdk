@@ -360,6 +360,7 @@ void main() {
     test('submits point authorization to action URL', () async {
       final requests = <http.Request>[];
       final client = MisePayClient(
+        allowedOrigins: {'https://api-dev.misepay.app'},
         httpClient: MockClient((request) async {
           requests.add(request);
           return _jsonResponse(_paymentIntentJson(
@@ -394,6 +395,7 @@ void main() {
         () async {
       final requests = <http.Request>[];
       final client = MisePayClient(
+        allowedOrigins: {'https://api-dev.misepay.app'},
         httpClient: MockClient((request) async {
           requests.add(request);
           return _jsonResponse(_paymentIntentJson(
@@ -440,6 +442,7 @@ void main() {
     test('submits transaction hash to action URL', () async {
       final requests = <http.Request>[];
       final client = MisePayClient(
+        allowedOrigins: {'https://api-dev.misepay.app'},
         httpClient: MockClient((request) async {
           requests.add(request);
           return _jsonResponse({
@@ -466,6 +469,75 @@ void main() {
         'tx_hash': '0xtx',
       });
       expect(updated.status, PaymentIntentStatus.requiresPayment);
+    });
+
+    test('rejects point authorization action from an untrusted origin',
+        () async {
+      final requests = <http.Request>[];
+      final client = MisePayClient(
+        allowedOrigins: {'https://api-dev.misepay.app'},
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          return _jsonResponse(_paymentIntentJson());
+        }),
+      );
+      final intent = PaymentIntent.fromJson(_paymentIntentJson(
+        payer: _payerJson(),
+        actions: {
+          'submit_point_authorization':
+              'https://evil.example/v1/payment-intents/pi_123/benefits',
+          'submit_payment_proof':
+              'https://api-dev.misepay.app/v1/payment-intents/pi_123/payment-proofs',
+        },
+      ));
+      final authorization = client.paymentIntents.authorizePoints(
+        paymentIntent: intent,
+        paymentOption: intent.paymentOptions.single,
+        pointAmount: '2',
+      );
+
+      await expectLater(
+        client.paymentIntents.applyPoints(
+          paymentIntent: intent,
+          authorization: authorization,
+          signature: '0xsig',
+        ),
+        throwsA(isA<MisePayException>()
+            .having((error) => error.code, 'code', 'UNTRUSTED_REQUEST_ORIGIN')),
+      );
+      expect(requests, isEmpty);
+    });
+
+    test('rejects payment proof action from an untrusted origin', () async {
+      final requests = <http.Request>[];
+      final client = MisePayClient(
+        allowedOrigins: {'https://api-dev.misepay.app'},
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          return _jsonResponse(_paymentIntentJson());
+        }),
+      );
+      final intent = PaymentIntent.fromJson(_paymentIntentJson(
+        payer: _payerJson(),
+        actions: {
+          'submit_point_authorization':
+              'https://api-dev.misepay.app/v1/payment-intents/pi_123/benefits',
+          'submit_payment_proof':
+              'https://evil.example/v1/payment-intents/pi_123/payment-proofs',
+        },
+      ));
+
+      await expectLater(
+        client.paymentIntents.provePayment(
+          paymentIntent: intent,
+          chainId: 137,
+          tokenAddress: '0xJPYCPolygon',
+          txHash: '0xtx',
+        ),
+        throwsA(isA<MisePayException>()
+            .having((error) => error.code, 'code', 'UNTRUSTED_REQUEST_ORIGIN')),
+      );
+      expect(requests, isEmpty);
     });
 
     test('fails locally when point authorization action is unavailable',
@@ -535,6 +607,7 @@ void main() {
 
     test('preserves backend machine-readable error codes', () async {
       final client = MisePayClient(
+        allowedOrigins: {'https://api-dev.misepay.app'},
         httpClient: MockClient((request) async {
           return http.Response(
             jsonEncode({
