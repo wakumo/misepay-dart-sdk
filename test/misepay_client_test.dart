@@ -409,6 +409,67 @@ void main() {
           'https://api-dev.misepay.app/v1/payment-intents/pi_123');
     });
 
+    test('parses and serializes persisted creation and display metadata', () {
+      final intent = PaymentIntent.fromJson(_paymentIntentJson(
+        createdAt: '2026-08-10T04:00:00.009Z',
+        merchantImageUrl: 'https://cdn.example.com/merchant.jpg',
+        storeImageUrl: 'https://cdn.example.com/store.jpg',
+      ));
+
+      expect(intent.createdAt, DateTime.parse('2026-08-10T04:00:00.009Z'));
+      expect(intent.merchant.imageUrl,
+          'https://cdn.example.com/merchant.jpg');
+      expect(intent.store.imageUrl, 'https://cdn.example.com/store.jpg');
+      expect(intent.toJson()['created_at'], '2026-08-10T04:00:00.009Z');
+      expect(intent.toJson()['merchant'], {
+        'name': 'Cafe ABC',
+        'image_url': 'https://cdn.example.com/merchant.jpg',
+      });
+      expect(intent.toJson()['store'], {
+        'name': 'Shibuya Store',
+        'image_url': 'https://cdn.example.com/store.jpg',
+      });
+    });
+
+    test('accepts older payloads without creation or image metadata', () {
+      final json = _paymentIntentJson()..remove('created_at');
+      (json['merchant'] as Map<String, dynamic>).remove('image_url');
+      (json['store'] as Map<String, dynamic>).remove('image_url');
+
+      final intent = PaymentIntent.fromJson(json);
+
+      expect(intent.createdAt, isNull);
+      expect(intent.merchant.imageUrl, isNull);
+      expect(intent.store.imageUrl, isNull);
+      expect(intent.toJson()['created_at'], isNull);
+      expect(intent.toJson()['merchant'], {
+        'name': 'Cafe ABC',
+        'image_url': null,
+      });
+      expect(intent.toJson()['store'], {
+        'name': 'Shibuya Store',
+        'image_url': null,
+      });
+    });
+
+    test('normalizes null and blank display metadata as unavailable', () {
+      final nullIntent = PaymentIntent.fromJson(_paymentIntentJson(
+        createdAt: null,
+        merchantImageUrl: null,
+        storeImageUrl: null,
+      ));
+      final blankJson = _paymentIntentJson();
+      (blankJson['merchant'] as Map<String, dynamic>)['image_url'] = '   ';
+      (blankJson['store'] as Map<String, dynamic>)['image_url'] = '';
+      final blankIntent = PaymentIntent.fromJson(blankJson);
+
+      expect(nullIntent.createdAt, isNull);
+      expect(nullIntent.merchant.imageUrl, isNull);
+      expect(nullIntent.store.imageUrl, isNull);
+      expect(blankIntent.merchant.imageUrl, isNull);
+      expect(blankIntent.store.imageUrl, isNull);
+    });
+
     test('accepts PaymentIntent payload version 1', () {
       final intent = PaymentIntent.fromJson(_paymentIntentJson());
 
@@ -729,14 +790,17 @@ Map<String, dynamic> _paymentIntentJson({
   String? net,
   int assetDecimals = 18,
   String paymentOptionAmountBaseUnits = '10500000000000000000',
+  String? createdAt = '2026-08-10T04:00:00.000Z',
+  String? merchantImageUrl,
+  String? storeImageUrl,
 }) {
   final json = {
     'version': 1,
     'id': 'pi_123',
     'request_uri': 'https://api-dev.misepay.app/v1/payment-intents/pi_123',
     'status': status,
-    'merchant': {'name': 'Cafe ABC'},
-    'store': {'name': 'Shibuya Store'},
+    'merchant': {'name': 'Cafe ABC', 'image_url': merchantImageUrl},
+    'store': {'name': 'Shibuya Store', 'image_url': storeImageUrl},
     'payer': payer,
     'amount': {
       'currency': 'JPY',
@@ -763,6 +827,7 @@ Map<String, dynamic> _paymentIntentJson({
           'submit_payment_proof':
               'https://api-dev.misepay.app/v1/payment-intents/pi_123/payment-proofs',
         },
+    'created_at': createdAt,
     'expires_at': '2026-07-06T12:05:00Z',
   };
   return json;

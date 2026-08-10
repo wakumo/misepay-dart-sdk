@@ -48,6 +48,9 @@ await misepayClient.paymentIntents.provePayment(
 - Follow-up API calls MUST use response `actions` URLs.
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.
 - The SDK accepts PaymentIntent payload version `1` and rejects any other version with `UNSUPPORTED_PAYMENT_INTENT_VERSION` before using payment instructions or actions.
+- The SDK exposes API `created_at` as nullable `PaymentIntent.createdAt` so it remains compatible with older deployments where the field is missing or null.
+- Merchant and Store summaries expose nullable `imageUrl` values from `image_url`. Missing, null, empty, and whitespace-only values are unavailable.
+- Wallet UI owns image selection and load-error fallback in Store, Merchant, local-placeholder order. The SDK does not select a fallback or probe image URLs with HTTP `HEAD` requests.
 - Point identity is backend-owned as `merchant_id + point_type + holder_address`. For the POC, `point_type` has a single backend default value. The SDK/app sends only `payerAddress`; it does not send or choose `point_type`.
 - Payment chain is not part of point identity.
 - EIP-712 domain salt labels are derived from the SDK environment, not from app input, the link, or the API response. The configured labels are `misepay:prod` for production and `misepay:dev` for development. Before signing, `typedData.domain.salt` is set to `keccak256(UTF-8(label))` as a lowercase, `0x`-prefixed bytes32.
@@ -73,8 +76,11 @@ Without `payerAddress`, the canonical resource explicitly contains
   "id": "pi_123",
   "request_uri": "https://api.misepay.app/v1/payment-intents/pi_123",
   "status": "pending",
-  "merchant": { "name": "Cafe ABC" },
-  "store": { "name": "Shibuya Store" },
+  "merchant": {
+    "name": "Cafe ABC",
+    "image_url": "https://cdn.example.com/merchants/cafe-abc.jpg"
+  },
+  "store": { "name": "Shibuya Store", "image_url": null },
   "payer": null,
   "amount": {
     "currency": "JPY",
@@ -97,6 +103,7 @@ Without `payerAddress`, the canonical resource explicitly contains
     "submit_point_authorization": "https://api.misepay.app/v1/payment-intents/pi_123/benefits",
     "submit_payment_proof": "https://api.misepay.app/v1/payment-intents/pi_123/payment-proofs"
   },
+  "created_at": "2026-07-06T12:00:00Z",
   "expires_at": "2026-07-06T12:05:00Z"
 }
 ```
@@ -110,8 +117,11 @@ balance and authorization values:
   "id": "pi_123",
   "request_uri": "https://api.misepay.app/v1/payment-intents/pi_123",
   "status": "pending",
-  "merchant": { "name": "Cafe ABC" },
-  "store": { "name": "Shibuya Store" },
+  "merchant": {
+    "name": "Cafe ABC",
+    "image_url": "https://cdn.example.com/merchants/cafe-abc.jpg"
+  },
+  "store": { "name": "Shibuya Store", "image_url": null },
   "payer": {
     "address": "0xabc...",
     "point": {
@@ -144,6 +154,7 @@ balance and authorization values:
     "submit_point_authorization": "https://api.misepay.app/v1/payment-intents/pi_123/benefits",
     "submit_payment_proof": "https://api.misepay.app/v1/payment-intents/pi_123/payment-proofs"
   },
+  "created_at": "2026-07-06T12:00:00Z",
   "expires_at": "2026-07-06T12:05:00Z"
 }
 ```
@@ -161,6 +172,12 @@ shape. Replace local state with each returned PaymentIntent and use its
 `requestUri` for the next poll. When the backend creates a replacement intent
 after expiry, use the replacement resource's new `requestUri` to generate the
 new QR; do not reuse the expired URI.
+
+The API requires `created_at`, `merchant.image_url`, and `store.image_url` on
+the canonical response. The SDK intentionally treats them as nullable for
+staggered rollout compatibility and serializes unavailable values as null. It
+keeps Store and Merchant images separate so wallet UI can retry the Merchant
+image when the Store image is absent or fails to load.
 
 ## EIP-712 Typed Data
 
