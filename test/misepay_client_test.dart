@@ -417,8 +417,7 @@ void main() {
       ));
 
       expect(intent.createdAt, DateTime.parse('2026-08-10T04:00:00.009Z'));
-      expect(intent.merchant.imageUrl,
-          'https://cdn.example.com/merchant.jpg');
+      expect(intent.merchant.imageUrl, 'https://cdn.example.com/merchant.jpg');
       expect(intent.store.imageUrl, 'https://cdn.example.com/store.jpg');
       expect(intent.toJson()['created_at'], '2026-08-10T04:00:00.009Z');
       expect(intent.toJson()['merchant'], {
@@ -790,7 +789,7 @@ Map<String, dynamic> _paymentIntentJson({
   String? net,
   int assetDecimals = 18,
   String paymentOptionAmountBaseUnits = '10500000000000000000',
-  String? createdAt = '2026-08-10T04:00:00.000Z',
+  String? createdAt = '2026-08-10T04:00:00Z',
   String? merchantImageUrl,
   String? storeImageUrl,
 }) {

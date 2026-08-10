@@ -4,8 +4,7 @@ class Merchant {
   const Merchant({required this.name, this.imageUrl});
 
   /// Parses a merchant summary from API JSON.
-  factory Merchant.fromJson(Map<String, dynamic> json) =>
-      Merchant(
+  factory Merchant.fromJson(Map<String, dynamic> json) => Merchant(
         name: json['name'] as String,
         imageUrl: _optionalNonBlankString(json['image_url']),
       );

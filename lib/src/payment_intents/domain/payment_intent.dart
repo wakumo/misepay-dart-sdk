@@ -108,8 +108,7 @@ class PaymentIntent {
       'payment_options':
           paymentOptions.map((option) => option.toJson()).toList(),
       'actions': actions.toJson(),
-      'created_at':
-          createdAt == null ? null : _formatUtcTimestamp(createdAt!),
+      'created_at': createdAt == null ? null : _formatUtcTimestamp(createdAt!),
       'expires_at': _formatUtcTimestamp(expiresAt),
       'payer': payer?.toJson(),
     };

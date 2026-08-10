@@ -4,8 +4,7 @@ class Store {
   const Store({required this.name, this.imageUrl});
 
   /// Parses a store summary from API JSON.
-  factory Store.fromJson(Map<String, dynamic> json) =>
-      Store(
+  factory Store.fromJson(Map<String, dynamic> json) => Store(
         name: json['name'] as String,
         imageUrl: _optionalNonBlankString(json['image_url']),
       );
