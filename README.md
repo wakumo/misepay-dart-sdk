@@ -64,8 +64,11 @@ Read response data through typed fields:
 paymentIntent.id;
 paymentIntent.requestUri;
 paymentIntent.status;
+paymentIntent.createdAt;
 paymentIntent.merchant.name;
+paymentIntent.merchant.imageUrl;
 paymentIntent.store.name;
+paymentIntent.store.imageUrl;
 paymentIntent.amount.gross;
 paymentIntent.amount.net;
 paymentIntent.payer?.point.balance.available;
@@ -108,6 +111,13 @@ current backend snapshot, not an additional amount. The SDK exposes the latter
 as `authorization.maxAmount`. Internal benefit lifecycle status is not part of
 the public SDK model.
 
+`createdAt`, `merchant.imageUrl`, and `store.imageUrl` are nullable so the SDK
+remains compatible while API deployments roll out independently. The canonical
+API supplies `created_at` and both `image_url` keys. For checkout presentation,
+try a nonblank Store image first, then a nonblank Merchant image, then a local
+placeholder. Handle image load errors directly; do not issue HTTP `HEAD`
+requests to probe whether an image URL exists.
+
 Serialize typed response data when you need to cache, log, debug, or pass data across app layers:
 
 ```dart
@@ -134,8 +144,9 @@ while (current.status == PaymentIntentStatus.pending) {
 ```
 
 Terminal PaymentIntents remain readable resources. Their merchant, store,
-payer, amount, benefit, expiry, and status fields remain available for UI
-rendering, while `paymentOptions` is empty and both action URLs are `null`.
+creation time, payer, amount, benefit, expiry, and status fields remain
+available for UI rendering, while `paymentOptions` is empty and both action
+URLs are `null`.
 Always branch on `status` before attempting payment or point authorization:
 
 - `completed`: show success and do not submit another transaction.
