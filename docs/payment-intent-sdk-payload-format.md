@@ -190,6 +190,11 @@ image when the Store image is absent or fails to load.
   },
   "primaryType": "PaymentIntentPointAuthorization",
   "types": {
+    "EIP712Domain": [
+      { "name": "name", "type": "string" },
+      { "name": "version", "type": "string" },
+      { "name": "salt", "type": "bytes32" }
+    ],
     "PaymentIntentPointAuthorization": [
       { "name": "intentId", "type": "string" },
       { "name": "payer", "type": "address" },

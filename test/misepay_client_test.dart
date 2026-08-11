@@ -207,6 +207,14 @@ void main() {
       });
       expect(
           (authorization.typedData['types']
+              as Map<String, dynamic>)['EIP712Domain'],
+          [
+            {'name': 'name', 'type': 'string'},
+            {'name': 'version', 'type': 'string'},
+            {'name': 'salt', 'type': 'bytes32'},
+          ]);
+      expect(
+          (authorization.typedData['types']
               as Map<String, dynamic>)['PaymentIntentPointAuthorization'],
           [
             {'name': 'intentId', 'type': 'string'},
