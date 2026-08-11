@@ -438,6 +438,37 @@ void main() {
       });
     });
 
+    test('parses and serializes terminal timestamps', () {
+      final intent = PaymentIntent.fromJson(_paymentIntentJson(
+        status: 'completed',
+        completedAt: '2026-08-11T03:04:05.006Z',
+        cancelledAt: '2026-08-11T04:05:06.007Z',
+      ));
+
+      expect(intent.completedAt, DateTime.parse('2026-08-11T03:04:05.006Z'));
+      expect(intent.cancelledAt, DateTime.parse('2026-08-11T04:05:06.007Z'));
+      expect(intent.toJson()['completed_at'], '2026-08-11T03:04:05.006Z');
+      expect(intent.toJson()['cancelled_at'], '2026-08-11T04:05:06.007Z');
+    });
+
+    test('accepts missing and null terminal timestamps', () {
+      final missingJson = _paymentIntentJson()
+        ..remove('completed_at')
+        ..remove('cancelled_at');
+      final missingIntent = PaymentIntent.fromJson(missingJson);
+      final nullIntent = PaymentIntent.fromJson(_paymentIntentJson(
+        completedAt: null,
+        cancelledAt: null,
+      ));
+
+      expect(missingIntent.completedAt, isNull);
+      expect(missingIntent.cancelledAt, isNull);
+      expect(nullIntent.completedAt, isNull);
+      expect(nullIntent.cancelledAt, isNull);
+      expect(missingIntent.toJson()['completed_at'], isNull);
+      expect(missingIntent.toJson()['cancelled_at'], isNull);
+    });
+
     test('accepts older payloads without creation or image metadata', () {
       final json = _paymentIntentJson()..remove('created_at');
       (json['merchant'] as Map<String, dynamic>).remove('image_url');
@@ -872,6 +903,8 @@ Map<String, dynamic> _paymentIntentJson({
   int assetDecimals = 18,
   String paymentOptionAmountBaseUnits = '10500000000000000000',
   String? createdAt = '2026-08-10T04:00:00Z',
+  String? completedAt,
+  String? cancelledAt,
   String? merchantImageUrl,
   String? storeImageUrl,
 }) {
@@ -909,6 +942,8 @@ Map<String, dynamic> _paymentIntentJson({
               'https://api-dev.misepay.app/v1/payment-intents/pi_123/payment-proofs',
         },
     'created_at': createdAt,
+    'completed_at': completedAt,
+    'cancelled_at': cancelledAt,
     'expires_at': '2026-07-06T12:05:00Z',
   };
   return json;

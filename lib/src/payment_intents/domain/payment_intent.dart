@@ -22,6 +22,8 @@ class PaymentIntent {
     required this.actions,
     required this.expiresAt,
     this.createdAt,
+    this.completedAt,
+    this.cancelledAt,
     this.payer,
   });
 
@@ -55,6 +57,12 @@ class PaymentIntent {
       createdAt: json['created_at'] == null
           ? null
           : DateTime.parse(json['created_at'] as String),
+      completedAt: json['completed_at'] == null
+          ? null
+          : DateTime.parse(json['completed_at'] as String),
+      cancelledAt: json['cancelled_at'] == null
+          ? null
+          : DateTime.parse(json['cancelled_at'] as String),
       expiresAt: DateTime.parse(json['expires_at'] as String),
     );
   }
@@ -95,6 +103,12 @@ class PaymentIntent {
   /// Persisted PaymentIntent creation timestamp when supplied by the API.
   final DateTime? createdAt;
 
+  /// Persisted PaymentIntent completion timestamp when supplied by the API.
+  final DateTime? completedAt;
+
+  /// Persisted PaymentIntent cancellation timestamp when supplied by the API.
+  final DateTime? cancelledAt;
+
   /// Serializes this typed model back to API-shaped JSON.
   Map<String, dynamic> toJson() {
     return {
@@ -109,6 +123,10 @@ class PaymentIntent {
           paymentOptions.map((option) => option.toJson()).toList(),
       'actions': actions.toJson(),
       'created_at': createdAt == null ? null : _formatUtcTimestamp(createdAt!),
+      'completed_at':
+          completedAt == null ? null : _formatUtcTimestamp(completedAt!),
+      'cancelled_at':
+          cancelledAt == null ? null : _formatUtcTimestamp(cancelledAt!),
       'expires_at': _formatUtcTimestamp(expiresAt),
       'payer': payer?.toJson(),
     };

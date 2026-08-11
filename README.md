@@ -65,6 +65,8 @@ paymentIntent.id;
 paymentIntent.requestUri;
 paymentIntent.status;
 paymentIntent.createdAt;
+paymentIntent.completedAt;
+paymentIntent.cancelledAt;
 paymentIntent.merchant.name;
 paymentIntent.merchant.imageUrl;
 paymentIntent.store.name;
@@ -111,9 +113,10 @@ current backend snapshot, not an additional amount. The SDK exposes the latter
 as `authorization.maxAmount`. Internal benefit lifecycle status is not part of
 the public SDK model.
 
-`createdAt`, `merchant.imageUrl`, and `store.imageUrl` are nullable so the SDK
-remains compatible while API deployments roll out independently. The canonical
-API supplies `created_at` and both `image_url` keys. For checkout presentation,
+`createdAt`, `completedAt`, `cancelledAt`, `merchant.imageUrl`, and
+`store.imageUrl` are nullable so the SDK remains compatible while API
+deployments roll out independently. The canonical API supplies `created_at`,
+`completed_at`, `cancelled_at`, and both `image_url` keys. For checkout presentation,
 try a nonblank Store image first, then a nonblank Merchant image, then a local
 placeholder. Handle image load errors directly; do not issue HTTP `HEAD`
 requests to probe whether an image URL exists.
@@ -144,7 +147,7 @@ while (current.status == PaymentIntentStatus.pending) {
 ```
 
 Terminal PaymentIntents remain readable resources. Their merchant, store,
-creation time, payer, amount, benefit, expiry, and status fields remain
+creation time, nullable completion/cancellation time, payer, amount, benefit, expiry, and status fields remain
 available for UI rendering, while `paymentOptions` is empty and both action
 URLs are `null`.
 Always branch on `status` before attempting payment or point authorization:
@@ -157,6 +160,11 @@ Always branch on `status` before attempting payment or point authorization:
 `expiresAt` can drive a local countdown, but the status returned by the backend
 is authoritative. Fetch once more when the countdown elapses so the backend can
 finalize and return the persisted `expired` resource.
+
+For terminal UI, use `completedAt` only with `completed` and `cancelledAt` only
+with `cancelled`. Either value can be null for historical data or during a
+staggered backend rollout; do not substitute `createdAt` or `expiresAt` as an
+invented terminal time.
 
 When a merchant creates a replacement PaymentIntent after expiry, the backend
 returns a new id, expiry, and `requestUri`. Generate the replacement QR from
