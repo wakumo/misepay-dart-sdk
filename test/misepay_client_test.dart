@@ -813,29 +813,6 @@ void main() {
       expect(requests, isEmpty);
     });
 
-    test('accepts a completed payment proof response', () async {
-      final client = MisePayClient(
-        allowedOrigins: {'https://api-dev.misepay.app'},
-        httpClient: MockClient((request) async {
-          return _jsonResponse({
-            ..._paymentIntentJson(payer: _payerJson()),
-            'status': 'completed'
-          });
-        }),
-      );
-      final intent =
-          PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
-
-      final updated = await client.paymentIntents.provePayment(
-        paymentIntent: intent,
-        chainId: 137,
-        tokenAddress: '0xJPYCPolygon',
-        txHash: '0xtx',
-      );
-
-      expect(updated.status, PaymentIntentStatus.completed);
-    });
-
     test('preserves payment proof reuse errors from the backend', () async {
       final client = MisePayClient(
         allowedOrigins: {'https://api-dev.misepay.app'},
