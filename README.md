@@ -245,14 +245,12 @@ final paidIntent = await client.paymentIntents.provePayment(
 );
 ```
 
-The backend independently verifies the configured chain, token contract,
-successful receipt, confirmation depth, recipient, and exact token base-unit
-amount. A `202 Accepted` response returns the current `pending` PaymentIntent
-while normal scanning continues; a `200 OK` response may return the completed
-PaymentIntent immediately. Replace local checkout state with either response;
-the returned `requestUri` remains the polling URI for that resource.
-Retries are safe, but a transaction already linked to another payment is
-reported with the backend `PAYMENT_PROOF_TRANSACTION_ALREADY_USED` code.
+The backend returns `202 Accepted` after durably scheduling independent chain,
+token, receipt, confirmation, recipient, and exact token base-unit verification.
+This response acknowledges background work; it does not confirm payment. Replace
+local checkout state with the returned PaymentIntent, then poll its `requestUri`
+until a terminal state is observed. Normal scanning remains the fallback if the
+bounded proof-verification job finishes too early or exhausts its retries.
 
 ## Errors
 
