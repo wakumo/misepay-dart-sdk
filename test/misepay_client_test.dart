@@ -417,6 +417,90 @@ void main() {
           'https://api-dev.misepay.app/v1/payment-intents/pi_123');
     });
 
+    test('defaults missing confirmed payment history to an empty list', () {
+      final json = _paymentIntentJson()..remove('confirmed_payments');
+
+      final intent = PaymentIntent.fromJson(json);
+
+      expect(intent.confirmedPayments, isEmpty);
+      expect(intent.toJson()['confirmed_payments'], isEmpty);
+    });
+
+    test('parses point-only completion with empty confirmed payment history',
+        () {
+      final intent = PaymentIntent.fromJson(_paymentIntentJson(
+        status: 'completed',
+        paymentOptions: [],
+        confirmedPayments: [],
+        gross: '15',
+        benefit: '15',
+        net: '0',
+      ));
+
+      expect(intent.paymentOptions, isEmpty);
+      expect(intent.confirmedPayments, isEmpty);
+    });
+
+    test('parses and serializes exact confirmed payment fields', () {
+      final receipt = _confirmedPaymentJson(
+        chainId: 97,
+        txHash:
+            '0x1111111111111111111111111111111111111111111111111111111111111111',
+        logIndex: 0,
+        blockTimestamp: '2026-08-11T10:00:00Z',
+      );
+
+      final intent = PaymentIntent.fromJson(_paymentIntentJson(
+        status: 'completed',
+        paymentOptions: [],
+        confirmedPayments: [receipt],
+      ));
+      final confirmedPayment = intent.confirmedPayments.single;
+
+      expect(confirmedPayment.chainId, 97);
+      expect(confirmedPayment.assetSymbol, 'JPYC');
+      expect(confirmedPayment.assetDecimals, 18);
+      expect(confirmedPayment.tokenAddress, '0x409eToken');
+      expect(confirmedPayment.amountBaseUnits, '15000000000000000000');
+      expect(confirmedPayment.txHash,
+          '0x1111111111111111111111111111111111111111111111111111111111111111');
+      expect(confirmedPayment.logIndex, 0);
+      expect(confirmedPayment.blockTimestamp,
+          DateTime.parse('2026-08-11T10:00:00Z'));
+      expect(intent.toJson()['confirmed_payments'], [receipt]);
+    });
+
+    test('round-trips multiple confirmed payments in API order', () {
+      final receipts = [
+        _confirmedPaymentJson(
+          chainId: 56,
+          txHash:
+              '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff',
+          logIndex: 7,
+          blockTimestamp: '2026-08-11T09:59:00Z',
+        ),
+        _confirmedPaymentJson(
+          chainId: 1,
+          txHash:
+              '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          logIndex: 2,
+          blockTimestamp: '2026-08-11T10:00:00Z',
+        ),
+      ];
+
+      final intent = PaymentIntent.fromJson(_paymentIntentJson(
+        status: 'completed',
+        paymentOptions: [],
+        confirmedPayments: receipts,
+      ));
+
+      expect(intent.confirmedPayments.map((payment) => payment.chainId),
+          orderedEquals([56, 1]));
+      expect(intent.confirmedPayments.last.amountBaseUnits,
+          '15000000000000000000');
+      expect(intent.toJson()['confirmed_payments'], receipts);
+    });
+
     test('parses and serializes persisted creation and display metadata', () {
       final intent = PaymentIntent.fromJson(_paymentIntentJson(
         createdAt: '2026-08-10T04:00:00.009Z',
@@ -895,6 +979,7 @@ Map<String, dynamic> _paymentIntentJson({
   Map<String, dynamic>? payer,
   Map<String, dynamic>? actions,
   List<Map<String, dynamic>>? paymentOptions,
+  List<Map<String, dynamic>>? confirmedPayments,
   String status = 'pending',
   String? chainName,
   String gross = '10',
@@ -934,6 +1019,7 @@ Map<String, dynamic> _paymentIntentJson({
             'amount_base_units': paymentOptionAmountBaseUnits,
           },
         ],
+    'confirmed_payments': confirmedPayments ?? [],
     'actions': actions ??
         {
           'submit_point_authorization':
@@ -948,6 +1034,23 @@ Map<String, dynamic> _paymentIntentJson({
   };
   return json;
 }
+
+Map<String, dynamic> _confirmedPaymentJson({
+  required int chainId,
+  required String txHash,
+  required int logIndex,
+  required String blockTimestamp,
+}) =>
+    {
+      'chain_id': chainId,
+      'asset_symbol': 'JPYC',
+      'asset_decimals': 18,
+      'token_address': '0x409eToken',
+      'amount_base_units': '15000000000000000000',
+      'tx_hash': txHash,
+      'log_index': logIndex,
+      'block_timestamp': blockTimestamp,
+    };
 
 Map<String, dynamic> _payerJson({
   String? address = '0xabc',

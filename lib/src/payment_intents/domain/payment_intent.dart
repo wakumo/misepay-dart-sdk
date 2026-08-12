@@ -1,5 +1,6 @@
 import '../../core/misepay_exception.dart';
 import 'amount_summary.dart';
+import 'confirmed_payment.dart';
 import 'merchant.dart';
 import 'payer.dart';
 import 'payment_intent_actions.dart';
@@ -19,6 +20,7 @@ class PaymentIntent {
     required this.store,
     required this.amount,
     required this.paymentOptions,
+    required this.confirmedPayments,
     required this.actions,
     required this.expiresAt,
     this.createdAt,
@@ -52,6 +54,11 @@ class PaymentIntent {
           .map((option) =>
               PaymentOption.fromJson(option as Map<String, dynamic>))
           .toList(),
+      confirmedPayments:
+          (json['confirmed_payments'] as List<dynamic>? ?? const <dynamic>[])
+              .map((payment) =>
+                  ConfirmedPayment.fromJson(payment as Map<String, dynamic>))
+              .toList(),
       actions: PaymentIntentActions.fromJson(
           json['actions'] as Map<String, dynamic>),
       createdAt: json['created_at'] == null
@@ -94,6 +101,9 @@ class PaymentIntent {
   /// Available on-chain payment options for the net amount.
   final List<PaymentOption> paymentOptions;
 
+  /// Verified inbound token payments linked to this exact PaymentIntent.
+  final List<ConfirmedPayment> confirmedPayments;
+
   /// Backend-provided action URLs for follow-up submissions.
   final PaymentIntentActions actions;
 
@@ -121,6 +131,8 @@ class PaymentIntent {
       'amount': amount.toJson(),
       'payment_options':
           paymentOptions.map((option) => option.toJson()).toList(),
+      'confirmed_payments':
+          confirmedPayments.map((payment) => payment.toJson()).toList(),
       'actions': actions.toJson(),
       'created_at': createdAt == null ? null : _formatUtcTimestamp(createdAt!),
       'completed_at':

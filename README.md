@@ -149,7 +149,33 @@ while (current.status == PaymentIntentStatus.pending) {
 Terminal PaymentIntents remain readable resources. Their merchant, store,
 creation time, nullable completion/cancellation time, payer, amount, benefit, expiry, and status fields remain
 available for UI rendering, while `paymentOptions` is empty and both action
-URLs are `null`.
+URLs are `null`. `paymentOptions` describes routes that can be used now; never
+retain or reuse it as historical evidence after completion. Read the actual
+verified token transfer from `confirmedPayments` instead.
+
+```dart
+if (current.status == PaymentIntentStatus.completed) {
+  if (current.confirmedPayments.isNotEmpty) {
+    final receipt = current.confirmedPayments.first;
+    showTokenReceipt(
+      chainId: receipt.chainId,
+      symbol: receipt.assetSymbol,
+      amountBaseUnits: receipt.amountBaseUnits,
+      transactionHash: receipt.txHash,
+    );
+  } else if (current.amount.net == '0' && current.amount.benefit != '0') {
+    showPointOnlyCompletion();
+  } else {
+    showCompletedWithReceiptUnavailable();
+  }
+}
+```
+
+`confirmedPayments` is in deterministic backend order and currently contains
+zero or one item. A point-only completion has an empty list. The SDK also
+defaults a missing JSON field to an empty list during backend-first rollout, so
+do not invent a token or network when the list is empty, and do not fall back to
+stale `paymentOptions`.
 Always branch on `status` before attempting payment or point authorization:
 
 - `completed`: show success and do not submit another transaction.
