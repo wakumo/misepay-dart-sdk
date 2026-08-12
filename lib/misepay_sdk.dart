@@ -3,6 +3,7 @@ export 'src/misepay_environment.dart';
 export 'src/misepay_client.dart';
 export 'src/payment_intents/payment_intents_client.dart';
 export 'src/payment_intents/domain/amount_summary.dart';
+export 'src/payment_intents/domain/confirmed_payment.dart';
 export 'src/payment_intents/domain/merchant.dart';
 export 'src/payment_intents/domain/payer.dart';
 export 'src/payment_intents/domain/payment_intent.dart';
