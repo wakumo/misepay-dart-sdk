@@ -60,9 +60,9 @@ await misepayClient.paymentIntents.provePayment(
 - `amount.gross`, `amount.benefit`, and `amount.net` are backend-derived display/accounting values and are not part of point consent.
 - Each `payment_options[].amount_base_units` is the current expected token payment in token base units, scaled using that asset's decimals.
 - Point authorization is independent of chain and payment option. The SDK needs no settlement option to construct it.
-- The V1 EIP-712 message signs exactly `intentId`, `payer`, `pointAmount`, and `expiresAt`. There is no fallback for the unreleased earlier message shape.
+- The single EIP-712 domain version `1` message signs `intentId`, `payer`, `pointAmount`, `authorizationRevision`, and `expiresAt`. The SDK signs the current response revision plus one; the first authorization therefore uses revision `1`.
 - `authorizePoints` is local SDK logic and MUST NOT call a quote endpoint.
-- Any point amount change requires EIP-712 signature.
+- Any point amount change requires a new signature and the next revision. `applyPoints` always submits the required `authorization_revision` field.
 - If current point amount is already `0`, cancellation is a no-op and should not submit.
 - On submission, the backend locks canonical state and recomputes current remaining value, available point balance, benefit, net amount, and settlement base units before reserving points.
 - A signature remains usable after verified payment state changes only while its exact point amount is within the current remaining value.
@@ -135,7 +135,8 @@ balance and authorization values:
       "balance": { "available": "5000" },
       "authorization": {
         "amount": "0",
-        "max_amount": "3000"
+        "max_amount": "3000",
+        "revision": 0
       }
     }
   },
@@ -211,6 +212,7 @@ UI can retry the Merchant image when the Store image is absent or fails to load.
       { "name": "intentId", "type": "string" },
       { "name": "payer", "type": "address" },
       { "name": "pointAmount", "type": "uint256" },
+      { "name": "authorizationRevision", "type": "uint256" },
       { "name": "expiresAt", "type": "uint256" }
     ]
   },
@@ -218,12 +220,13 @@ UI can retry the Merchant image when the Store image is absent or fails to load.
     "intentId": "pi_123",
     "payer": "0xabc...",
     "pointAmount": "1200",
+    "authorizationRevision": "1",
     "expiresAt": 1783339500
   }
 }
 ```
 
-The payer authorizes exactly `1200` point units for `pi_123` until the stated expiry. The signature does not bind display/accounting amounts or settlement-token quantities. The backend derives those values from current canonical state when the authorization is submitted.
+The payer selects a total target of `1200` point units at revision `1` for `pi_123` until the stated expiry. The signature does not bind display/accounting amounts or settlement-token quantities. The backend derives those values from current canonical state when the authorization is submitted.
 
 ## Point Authorization Submit Body
 
@@ -231,6 +234,7 @@ The payer authorizes exactly `1200` point units for `pi_123` until the stated ex
 {
   "payer_address": "0xabc...",
   "point_amount": "1200",
+  "authorization_revision": 1,
   "signature": "0x..."
 }
 ```
@@ -241,7 +245,8 @@ The payer authorizes exactly `1200` point units for `pi_123` until the stated ex
 {
   "chain_id": 137,
   "token_address": "0xJPYCPolygon...",
-  "tx_hash": "0x..."
+  "tx_hash": "0x...",
+  "payer_address": "0xabc..."
 }
 ```
 

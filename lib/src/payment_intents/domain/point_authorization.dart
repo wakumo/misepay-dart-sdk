@@ -4,6 +4,7 @@ class PointAuthorization {
   const PointAuthorization({
     required this.payerAddress,
     required this.pointAmount,
+    required this.authorizationRevision,
     required this.typedData,
   });
 
@@ -12,6 +13,9 @@ class PointAuthorization {
 
   /// Selected point amount represented as an integer string.
   final String pointAmount;
+
+  /// Next authorization revision signed by the payer.
+  final int authorizationRevision;
 
   /// EIP-712 typed data to pass to the wallet signer.
   final Map<String, Object?> typedData;

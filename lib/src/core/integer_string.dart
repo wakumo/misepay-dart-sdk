@@ -1,7 +1,9 @@
 import 'misepay_exception.dart';
 
 BigInt parseNonNegativeIntegerString(String value, String errorCode) {
-  if (value.isEmpty || !_digitsOnly(value)) {
+  if (value.isEmpty ||
+      !_digitsOnly(value) ||
+      (value.length > 1 && value.startsWith('0'))) {
     throw MisePayException(
         errorCode, 'Expected a non-negative integer string.');
   }

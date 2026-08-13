@@ -220,14 +220,17 @@ void main() {
             {'name': 'intentId', 'type': 'string'},
             {'name': 'payer', 'type': 'address'},
             {'name': 'pointAmount', 'type': 'uint256'},
+            {'name': 'authorizationRevision', 'type': 'uint256'},
             {'name': 'expiresAt', 'type': 'uint256'},
           ]);
       expect(authorization.message, {
         'intentId': 'pi_123',
         'payer': '0xabc',
         'pointAmount': '2',
+        'authorizationRevision': '1',
         'expiresAt': 1783339500,
       });
+      expect(authorization.authorizationRevision, 1);
     });
 
     test('keeps 100 points unscaled for 6- and 18-decimal payment options', () {
@@ -257,6 +260,7 @@ void main() {
           'intentId': 'pi_123',
           'payer': '0xabc',
           'pointAmount': '100',
+          'authorizationRevision': '1',
           'expiresAt': 1783339500,
         });
         expect(intent.paymentOptions.single.assetDecimals, fixture.decimals);
@@ -338,12 +342,13 @@ void main() {
           PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
 
       for (final malformedPointAmount in [
-        '0',
         '-1',
         '100.0',
         '1,000',
         '+100',
-        ' 100'
+        ' 100',
+        '00',
+        '01'
       ]) {
         expect(
           () => client.paymentIntents.authorizePoints(
@@ -354,6 +359,15 @@ void main() {
               .having((error) => error.code, 'code', 'INVALID_POINT_AMOUNT')),
         );
       }
+      expect(
+        client.paymentIntents
+            .authorizePoints(
+                paymentIntent: PaymentIntent.fromJson(
+                    _paymentIntentJson(payer: _payerJson(intentAmount: '2'))),
+                pointAmount: '0')
+            .message['pointAmount'],
+        '0',
+      );
       expect(
         () => client.paymentIntents.authorizePoints(
           paymentIntent: PaymentIntent.fromJson(_paymentIntentJson(
@@ -390,6 +404,38 @@ void main() {
         () => PaymentIntent.fromJson(_paymentIntentJson(payer: payer)),
         throwsA(isA<TypeError>()),
       );
+    });
+
+    test(
+        'signs the next revision for increase, decrease, clear, and reapply targets',
+        () {
+      final client = MisePayClient();
+      final cases = [
+        (current: '1', target: '5', revision: 0),
+        (current: '5', target: '2', revision: 1),
+        (current: '2', target: '0', revision: 2),
+        (current: '0', target: '3', revision: 3),
+      ];
+
+      for (final transition in cases) {
+        final intent = PaymentIntent.fromJson(_paymentIntentJson(
+          payer: _payerJson(
+            intentAmount: transition.current,
+            maxAmount: '5',
+            revision: transition.revision,
+          ),
+        ));
+
+        final authorization = client.paymentIntents.authorizePoints(
+          paymentIntent: intent,
+          pointAmount: transition.target,
+        );
+
+        expect(authorization.pointAmount, transition.target);
+        expect(authorization.authorizationRevision, transition.revision + 1);
+        expect(authorization.message['authorizationRevision'],
+            (transition.revision + 1).toString());
+      }
     });
   });
 
@@ -672,6 +718,7 @@ void main() {
       expect(jsonDecode(requests.single.body), {
         'payer_address': '0xabc',
         'point_amount': '2',
+        'authorization_revision': 1,
         'signature': '0xsig',
       });
       expect(updated.payer?.point.authorization.amount, '2');
@@ -722,6 +769,7 @@ void main() {
       expect(payload, {
         'payer_address': '0xabc',
         'point_amount': '100',
+        'authorization_revision': 1,
         'signature': '0xsig',
       });
       expect(payload.values, isNot(contains('100000000')));
@@ -757,8 +805,35 @@ void main() {
         'chain_id': 137,
         'token_address': '0xJPYCPolygon',
         'tx_hash': '0xtx',
+        'payer_address': '0xabc',
       });
       expect(updated.status, PaymentIntentStatus.pending);
+    });
+
+    test('omits proof payer context when the PaymentIntent has no payer',
+        () async {
+      final requests = <http.Request>[];
+      final client = MisePayClient(
+        allowedOrigins: {'https://api-dev.misepay.app'},
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          return _jsonResponse(_paymentIntentJson(), statusCode: 202);
+        }),
+      );
+      final intent = PaymentIntent.fromJson(_paymentIntentJson());
+
+      await client.paymentIntents.provePayment(
+        paymentIntent: intent,
+        chainId: 137,
+        tokenAddress: '0xJPYCPolygon',
+        txHash: '0xtx',
+      );
+
+      expect(jsonDecode(requests.single.body), {
+        'chain_id': 137,
+        'token_address': '0xJPYCPolygon',
+        'tx_hash': '0xtx',
+      });
     });
 
     test('rejects point authorization action from an untrusted origin',
@@ -1051,12 +1126,17 @@ Map<String, dynamic> _payerJson({
   String available = '5',
   String intentAmount = '0',
   String maxAmount = '10',
+  int revision = 0,
 }) =>
     {
       'address': address,
       'point': {
         'label': 'MisePay Points',
         'balance': {'available': available},
-        'authorization': {'amount': intentAmount, 'max_amount': maxAmount},
+        'authorization': {
+          'amount': intentAmount,
+          'max_amount': maxAmount,
+          'revision': revision
+        },
       },
     };

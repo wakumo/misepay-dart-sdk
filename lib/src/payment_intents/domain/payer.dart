@@ -78,6 +78,7 @@ class PointAuthorizationContext {
   const PointAuthorizationContext({
     required this.amount,
     required this.maxAmount,
+    required this.revision,
   });
 
   /// Parses point authorization values from API JSON.
@@ -85,6 +86,7 @@ class PointAuthorizationContext {
       PointAuthorizationContext(
         amount: json['amount'] as String,
         maxAmount: json['max_amount'] as String,
+        revision: json['revision'] as int,
       );
 
   /// Point amount currently authorized for this PaymentIntent.
@@ -93,9 +95,13 @@ class PointAuthorizationContext {
   /// Total maximum point authorization target for the current snapshot.
   final String maxAmount;
 
+  /// Revision of the currently accepted point authorization.
+  final int revision;
+
   /// Serializes this value back to API-shaped JSON.
   Map<String, dynamic> toJson() => {
         'amount': amount,
         'max_amount': maxAmount,
+        'revision': revision,
       };
 }
