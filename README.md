@@ -222,15 +222,17 @@ selected payment option's exact `amountBaseUnits` when `updatedIntent.status`
 is `pending`. If it is `completed`, show success and do not send a token
 transaction.
 
-The V1 EIP-712 message signs exactly `intentId`, `payer`, `pointAmount`, and `expiresAt`. The domain remains version `1`; the unreleased earlier message shape is not supported as a fallback.
+The V2 EIP-712 message signs `intentId`, `payer`, the total `pointAmount` target, `authorizationRevision`, and `expiresAt`. The SDK reads the current response revision and signs the next one, preventing an older request from overwriting a newer selection.
 
 Keep these unit domains separate:
 
-- `pointAmount` is a positive integer point value where `1 point = 1 JPY`; it is never scaled using token decimals.
+- `pointAmount` is a non-negative integer point target where `1 point = 1 JPY`; zero clears an existing pending reservation and it is never scaled using token decimals.
 - `paymentIntent.amount.gross`, `benefit`, and `net` are backend-derived display/accounting values.
 - Each payment option's `amountBaseUnits` is an exact settlement-token quantity scaled by that asset's decimals.
 
 The backend locks current PaymentIntent state and recomputes remaining value, balance, benefit, net amount, and settlement base units when the signed authorization is submitted. Do not convert any of these string values to floating point.
+
+While the PaymentIntent remains pending, the same holder may increase, decrease, clear, or reapply points within the returned `authorization.maxAmount`. An unchanged selection is a local `POINT_AMOUNT_UNCHANGED` no-op. The holder remains bound after clearing to zero.
 
 ## Payment Proof
 
@@ -251,6 +253,7 @@ This response acknowledges background work; it does not confirm payment. Replace
 local checkout state with the returned PaymentIntent, then poll its `requestUri`
 until a terminal state is observed. Normal scanning remains the fallback if the
 bounded proof-verification job finishes too early or exhausts its retries.
+The SDK includes `paymentIntent.payer?.address` as proof response context when available; the backend does not treat that client value as verified transaction-sender evidence.
 
 ## Errors
 

@@ -73,6 +73,7 @@ class PaymentIntentApi implements PaymentIntentRepository {
         chainId: chainId,
         tokenAddress: tokenAddress,
         txHash: txHash,
+        payerAddress: intent.payer?.address,
       ),
     );
     return PaymentIntent.fromJson(parseJsonObjectResponse(response));
