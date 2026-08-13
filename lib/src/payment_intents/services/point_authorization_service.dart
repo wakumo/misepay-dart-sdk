@@ -16,30 +16,44 @@ class PointAuthorizationService {
     final payer = intent.payer;
     final payerAddress = payer?.address;
     if (payerAddress == null) {
-      throw MisePayException('PAYER_REQUIRED',
-          'Payer context is required to build point authorization.');
+      throw MisePayException(
+        'PAYER_REQUIRED',
+        'Payer context is required to build point authorization.',
+      );
     }
 
-    final selectedPointAmount =
-        parseNonNegativeIntegerString(pointAmount, 'INVALID_POINT_AMOUNT');
+    final selectedPointAmount = parseNonNegativeIntegerString(
+      pointAmount,
+      'INVALID_POINT_AMOUNT',
+    );
     final currentPointAmount = parseNonNegativeIntegerString(
-        payer!.point.authorization.amount, 'INVALID_CURRENT_POINT_AMOUNT');
+      payer!.point.authorization.amount,
+      'INVALID_CURRENT_POINT_AMOUNT',
+    );
     final maxPointAmount = parseNonNegativeIntegerString(
-        payer.point.authorization.maxAmount, 'INVALID_POINT_LIMIT');
+      payer.point.authorization.maxAmount,
+      'INVALID_POINT_LIMIT',
+    );
 
     if (selectedPointAmount > maxPointAmount) {
-      throw MisePayException('POINT_AMOUNT_EXCEEDS_MAX',
-          'Point amount exceeds maximum selectable amount.');
+      throw MisePayException(
+        'POINT_AMOUNT_EXCEEDS_MAX',
+        'Point amount exceeds maximum selectable amount.',
+      );
     }
     if (selectedPointAmount == currentPointAmount) {
       throw MisePayException(
-          'POINT_AMOUNT_UNCHANGED', 'Point amount is unchanged.');
+        'POINT_AMOUNT_UNCHANGED',
+        'Point amount is unchanged.',
+      );
     }
 
     final currentRevision = payer.point.authorization.revision;
     if (currentRevision < 0) {
-      throw MisePayException('INVALID_AUTHORIZATION_REVISION',
-          'Point authorization revision must be non-negative.');
+      throw MisePayException(
+        'INVALID_AUTHORIZATION_REVISION',
+        'Point authorization revision must be non-negative.',
+      );
     }
     final authorizationRevision = currentRevision + 1;
 
