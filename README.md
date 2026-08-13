@@ -76,6 +76,7 @@ paymentIntent.amount.net;
 paymentIntent.payer?.point.balance.available;
 paymentIntent.payer?.point.authorization.amount;
 paymentIntent.payer?.point.authorization.maxAmount;
+paymentIntent.payer?.point.authorization.revision;
 paymentIntent.paymentOptions.first.chainName;
 paymentIntent.paymentOptions.first.amountBaseUnits;
 ```
@@ -100,7 +101,8 @@ When `payerAddress` is provided, the SDK parses the canonical point context:
       "balance": { "available": "5000" },
       "authorization": {
         "amount": "1200",
-        "max_amount": "3000"
+        "max_amount": "3000",
+        "revision": 1
       }
     }
   }
@@ -222,7 +224,7 @@ selected payment option's exact `amountBaseUnits` when `updatedIntent.status`
 is `pending`. If it is `completed`, show success and do not send a token
 transaction.
 
-The V2 EIP-712 message signs `intentId`, `payer`, the total `pointAmount` target, `authorizationRevision`, and `expiresAt`. The SDK reads the current response revision and signs the next one, preventing an older request from overwriting a newer selection.
+The single EIP-712 domain version `1` message signs `intentId`, `payer`, the total `pointAmount` target, `authorizationRevision`, and `expiresAt`. The SDK reads the current response revision and signs the next one. The first authorization uses revision `1`; each later change uses the current revision plus one, preventing an older request from overwriting a newer selection.
 
 Keep these unit domains separate:
 

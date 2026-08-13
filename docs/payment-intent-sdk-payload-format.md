@@ -59,9 +59,9 @@ await misepayClient.paymentIntents.provePayment(
 - `amount.gross`, `amount.benefit`, and `amount.net` are backend-derived display/accounting values and are not part of point consent.
 - Each `payment_options[].amount_base_units` is the current expected token payment in token base units, scaled using that asset's decimals.
 - Point authorization is independent of chain and payment option. The SDK needs no settlement option to construct it.
-- The V2 EIP-712 message signs `intentId`, `payer`, `pointAmount`, `authorizationRevision`, and `expiresAt`. The SDK signs the current response revision plus one.
+- The single EIP-712 domain version `1` message signs `intentId`, `payer`, `pointAmount`, `authorizationRevision`, and `expiresAt`. The SDK signs the current response revision plus one; the first authorization therefore uses revision `1`.
 - `authorizePoints` is local SDK logic and MUST NOT call a quote endpoint.
-- Any point amount change requires a new V2 EIP-712 signature and the next revision.
+- Any point amount change requires a new signature and the next revision. `applyPoints` always submits the required `authorization_revision` field.
 - If current point amount is already `0`, cancellation is a no-op and should not submit.
 - On submission, the backend locks canonical state and recomputes current remaining value, available point balance, benefit, net amount, and settlement base units before reserving points.
 - A signature remains usable after verified payment state changes only while its exact point amount is within the current remaining value.
@@ -132,7 +132,8 @@ balance and authorization values:
       "balance": { "available": "5000" },
       "authorization": {
         "amount": "0",
-        "max_amount": "3000"
+        "max_amount": "3000",
+        "revision": 0
       }
     }
   },
@@ -193,7 +194,7 @@ image when the Store image is absent or fails to load.
 {
   "domain": {
     "name": "MisePay PaymentIntent",
-    "version": "2",
+    "version": "1",
     "salt": "0x934a72bcfc23658c976948324c105b63256b1fd78f220a1ac53fba14c85c8502"
   },
   "primaryType": "PaymentIntentPointAuthorization",

@@ -201,7 +201,7 @@ void main() {
           'PaymentIntentPointAuthorization');
       expect(authorization.typedData['domain'], {
         'name': 'MisePay PaymentIntent',
-        'version': '2',
+        'version': '1',
         'salt':
             '0x934a72bcfc23658c976948324c105b63256b1fd78f220a1ac53fba14c85c8502'
       });
@@ -283,7 +283,7 @@ void main() {
 
       expect(authorization.typedData['domain'], {
         'name': 'MisePay PaymentIntent',
-        'version': '2',
+        'version': '1',
         'salt':
             '0x956d16453a66b1c31ac6741fde6c1954711bc88cabafd92ef642c2a8ef219d9d'
       });
@@ -301,7 +301,7 @@ void main() {
 
       expect(authorization.typedData['domain'], {
         'name': 'MisePay PaymentIntent',
-        'version': '2',
+        'version': '1',
         'salt':
             '0xb6dce1b502f83af1b70625d604e6c7024247050c92d59830db9305b82da4ee9c'
       });

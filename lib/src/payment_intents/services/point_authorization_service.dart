@@ -73,7 +73,7 @@ class PointAuthorizationService {
       typedData: {
         'domain': {
           'name': 'MisePay PaymentIntent',
-          'version': '2',
+          'version': '1',
           'salt': ethereumKeccak256(domainSalt),
         },
         'primaryType': 'PaymentIntentPointAuthorization',
