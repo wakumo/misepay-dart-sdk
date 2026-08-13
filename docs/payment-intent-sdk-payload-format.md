@@ -48,6 +48,7 @@ await misepayClient.paymentIntents.provePayment(
 - Follow-up API calls MUST use response `actions` URLs.
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.
 - The SDK accepts PaymentIntent payload version `1` and rejects any other version with `UNSUPPORTED_PAYMENT_INTENT_VERSION` before using payment instructions or actions.
+- The SDK exposes API `order_id` as nullable `PaymentIntent.orderId` so payer clients can display a stable receipt reference while remaining compatible with deployments where the additive field is not available yet.
 - The SDK exposes API `created_at` as nullable `PaymentIntent.createdAt` so it remains compatible with older deployments where the field is missing or null.
 - The SDK exposes `completed_at` and `cancelled_at` as nullable `PaymentIntent.completedAt` and `PaymentIntent.cancelledAt`; missing and null fields remain null for staggered rollout and historical-data compatibility.
 - Merchant and Store summaries expose nullable `imageUrl` values from `image_url`. Missing, null, empty, and whitespace-only values are unavailable.
@@ -75,6 +76,7 @@ Without `payerAddress`, the canonical resource explicitly contains
 {
   "version": 1,
   "id": "pi_123",
+  "order_id": "order_123",
   "request_uri": "https://api.misepay.app/v1/payment-intents/pi_123",
   "status": "pending",
   "merchant": {
@@ -118,6 +120,7 @@ balance and authorization values:
 {
   "version": 1,
   "id": "pi_123",
+  "order_id": "order_123",
   "request_uri": "https://api.misepay.app/v1/payment-intents/pi_123",
   "status": "pending",
   "merchant": {
@@ -178,14 +181,15 @@ shape. Replace local state with each returned PaymentIntent and use its
 after expiry, use the replacement resource's new `requestUri` to generate the
 new QR; do not reuse the expired URI.
 
-The API requires `created_at`, `completed_at`, `cancelled_at`,
+The API requires `order_id`, `created_at`, `completed_at`, `cancelled_at`,
 `merchant.image_url`, and `store.image_url` on the canonical response. The SDK
 intentionally treats them as nullable for staggered rollout compatibility and
-serializes unavailable values as null. Terminal UI uses `completedAt` only for
-`completed` and `cancelledAt` only for `cancelled`; it does not infer a missing
-event time from another timestamp. The SDK
-keeps Store and Merchant images separate so wallet UI can retry the Merchant
-image when the Store image is absent or fails to load.
+serializes unavailable values as null. Payer UI may display `orderId` as the
+receipt reference when available; it must not invent a confirmed Order ID when
+the field is absent. Terminal UI uses `completedAt` only for `completed` and
+`cancelledAt` only for `cancelled`; it does not infer a missing event time from
+another timestamp. The SDK keeps Store and Merchant images separate so wallet
+UI can retry the Merchant image when the Store image is absent or fails to load.
 
 ## EIP-712 Typed Data
 

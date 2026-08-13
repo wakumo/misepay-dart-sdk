@@ -417,6 +417,22 @@ void main() {
           'https://api-dev.misepay.app/v1/payment-intents/pi_123');
     });
 
+    test('parses and serializes the linked Order ID', () {
+      final intent = PaymentIntent.fromJson(_paymentIntentJson());
+
+      expect(intent.orderId, 'order_123');
+      expect(intent.toJson()['order_id'], 'order_123');
+    });
+
+    test('accepts older payloads without the linked Order ID', () {
+      final json = _paymentIntentJson()..remove('order_id');
+
+      final intent = PaymentIntent.fromJson(json);
+
+      expect(intent.orderId, isNull);
+      expect(intent.toJson()['order_id'], isNull);
+    });
+
     test('defaults missing confirmed payment history to an empty list', () {
       final json = _paymentIntentJson()..remove('confirmed_payments');
 
@@ -973,6 +989,7 @@ Map<String, dynamic> _paymentIntentJson({
   final json = {
     'version': 1,
     'id': 'pi_123',
+    'order_id': 'order_123',
     'request_uri': 'https://api-dev.misepay.app/v1/payment-intents/pi_123',
     'status': status,
     'merchant': {'name': 'Cafe ABC', 'image_url': merchantImageUrl},
