@@ -23,6 +23,7 @@ class PaymentIntent {
     required this.confirmedPayments,
     required this.actions,
     required this.expiresAt,
+    this.orderId,
     this.createdAt,
     this.completedAt,
     this.cancelledAt,
@@ -42,6 +43,7 @@ class PaymentIntent {
     return PaymentIntent(
       version: version,
       id: json['id'] as String,
+      orderId: json['order_id'] as String?,
       requestUri: json['request_uri'] as String,
       status: PaymentIntentStatus.fromJson(json['status'] as String),
       merchant: Merchant.fromJson(json['merchant'] as Map<String, dynamic>),
@@ -79,6 +81,9 @@ class PaymentIntent {
 
   /// PaymentIntent identifier.
   final String id;
+
+  /// Linked Order identifier when supplied by the API.
+  final String? orderId;
 
   /// Canonical backend URI for fetching this exact PaymentIntent.
   final String requestUri;
@@ -124,6 +129,7 @@ class PaymentIntent {
     return {
       'version': version,
       'id': id,
+      'order_id': orderId,
       'request_uri': requestUri,
       'status': status.toJson(),
       'merchant': merchant.toJson(),
