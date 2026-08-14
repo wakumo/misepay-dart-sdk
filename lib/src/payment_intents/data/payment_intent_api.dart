@@ -60,6 +60,7 @@ class PaymentIntentApi implements PaymentIntentRepository {
     required int chainId,
     required String tokenAddress,
     required String txHash,
+    String? payerAddress,
   }) async {
     final actionUrl = intent.actions.submitPaymentProof;
     if (actionUrl == null) {
@@ -73,7 +74,7 @@ class PaymentIntentApi implements PaymentIntentRepository {
         chainId: chainId,
         tokenAddress: tokenAddress,
         txHash: txHash,
-        payerAddress: intent.payer?.address,
+        payerAddress: payerAddress,
       ),
     );
     return PaymentIntent.fromJson(parseJsonObjectResponse(response));

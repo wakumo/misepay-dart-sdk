@@ -2,7 +2,7 @@
 
 Dart SDK for MisePay PaymentIntent checkout flows.
 
-The SDK is Flutter-independent. Apps provide the selected payer address and signer; the SDK fetches PaymentIntent state, builds EIP-712 point authorization typed data, submits signed point authorizations, and submits transaction hashes for optional payment proof acceleration.
+The SDK is Flutter-independent. Apps keep connected-wallet state separate from the backend-owned PaymentIntent point holder. The SDK fetches PaymentIntent state, builds EIP-712 point authorization typed data, submits signed point authorizations, and submits transaction hashes for optional payment proof acceleration.
 
 See `docs/payment-intent-sdk-payload-format.md` for the contract used by both the MisePay backend and this SDK.
 
@@ -82,8 +82,8 @@ paymentIntent.paymentOptions.first.chainName;
 paymentIntent.paymentOptions.first.amountBaseUnits;
 ```
 
-When the PaymentIntent is fetched without `payerAddress`, the backend returns
-an explicit null payer context:
+When no point holder is bound and the PaymentIntent is fetched without
+`payerAddress`, the backend returns an explicit null payer context:
 
 ```json
 {
@@ -91,7 +91,9 @@ an explicit null payer context:
 }
 ```
 
-When `payerAddress` is provided, the SDK parses the canonical point context:
+When no holder is bound, `payerAddress` requests non-persisted preview context.
+After A authorizes points, the backend returns A as the canonical point context
+even if connected wallet B supplies a query or proof context:
 
 ```json
 {
@@ -114,7 +116,8 @@ When `payerAddress` is provided, the SDK parses the canonical point context:
 PaymentIntent. `authorization.max_amount` is the total target allowed for the
 current backend snapshot, not an additional amount. The SDK exposes the latter
 as `authorization.maxAmount`. Internal benefit lifecycle status is not part of
-the public SDK model.
+the public SDK model. `paymentIntent.payer` is therefore not connected-wallet
+state and must not be overwritten when the wallet provider switches accounts.
 
 `orderId`, `createdAt`, `completedAt`, `cancelledAt`, `merchant.imageUrl`, and
 `store.imageUrl` are nullable so the SDK remains compatible while API
@@ -164,6 +167,7 @@ if (current.status == PaymentIntentStatus.completed) {
     showTokenReceipt(
       chainId: receipt.chainId,
       symbol: receipt.assetSymbol,
+      senderAddress: receipt.fromAddress,
       amountBaseUnits: receipt.amountBaseUnits,
       transactionHash: receipt.txHash,
     );
@@ -175,11 +179,12 @@ if (current.status == PaymentIntentStatus.completed) {
 }
 ```
 
-`confirmedPayments` is in deterministic backend order and currently contains
-zero or one item. A point-only completion has an empty list. The SDK also
+`confirmedPayments` is in deterministic backend order and may contain every
+qualifying canonical transfer linked to this exact PaymentIntent. A point-only completion has an empty list. The SDK also
 defaults a missing JSON field to an empty list during backend-first rollout, so
 do not invent a token or network when the list is empty, and do not fall back to
-stale `paymentOptions`.
+stale `paymentOptions`. `ConfirmedPayment.fromAddress` is the verified ERC-20
+sender and is nullable only for staggered rollout against an older API response.
 Always branch on `status` before attempting payment or point authorization:
 
 - `completed`: show success and do not submit another transaction.
@@ -237,6 +242,7 @@ Keep these unit domains separate:
 The backend locks current PaymentIntent state and recomputes remaining value, balance, benefit, net amount, and settlement base units when the signed authorization is submitted. Do not convert any of these string values to floating point.
 
 While the PaymentIntent remains pending, the same holder may increase, decrease, clear, or reapply points within the returned `authorization.maxAmount`. An unchanged selection is a local `POINT_AMOUNT_UNCHANGED` no-op. The holder remains bound after clearing to zero.
+Another connected wallet cannot edit that holder's target; it must create or use a replacement PaymentIntent before authorizing its own points.
 
 ## Payment Proof
 
@@ -248,16 +254,28 @@ final paidIntent = await client.paymentIntents.provePayment(
   chainId: 137,
   tokenAddress: '0xJPYCPolygon',
   txHash: '0xtx',
+  payerAddress: connectedWalletAddress,
 );
 ```
 
 The backend returns `202 Accepted` after durably scheduling independent chain,
-token, receipt, confirmation, recipient, and exact token base-unit verification.
+token, receipt, confirmation, recipient, sender, and amount verification.
 This response acknowledges background work; it does not confirm payment. Replace
 local checkout state with the returned PaymentIntent, then poll its `requestUri`
 until a terminal state is observed. Normal scanning remains the fallback if the
 bounded proof-verification job finishes too early or exhausts its retries.
-The SDK includes `paymentIntent.payer?.address` as proof response context when available; the backend does not treat that client value as verified transaction-sender evidence.
+`payerAddress` is optional response-rendering context supplied by the app. The
+SDK does not infer it from `paymentIntent.payer`, and the backend does not
+validate it against the point holder or treat it as verified sender evidence.
+Only `confirmedPayments[].fromAddress`, populated after worker/scanner chain
+verification, identifies the token sender.
+
+An exact discounted transfer consumes A's reserved points. A transfer that
+alone covers or exceeds gross completes the PaymentIntent as token-only,
+releases A's reservation, and records any surplus without rewarding above
+gross. A proof transport/queue error means acceleration failed, not that the
+broadcast failed: retry the same proof or continue polling, and never resend
+JPYC because of a proof error.
 
 ## Errors
 

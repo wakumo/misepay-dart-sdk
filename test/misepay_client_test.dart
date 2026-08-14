@@ -506,6 +506,7 @@ void main() {
     test('parses and serializes exact confirmed payment fields', () {
       final receipt = _confirmedPaymentJson(
         chainId: 97,
+        fromAddress: '0xSenderB',
         txHash:
             '0x1111111111111111111111111111111111111111111111111111111111111111',
         logIndex: 0,
@@ -523,6 +524,7 @@ void main() {
       expect(confirmedPayment.assetSymbol, 'JPYC');
       expect(confirmedPayment.assetDecimals, 18);
       expect(confirmedPayment.tokenAddress, '0x409eToken');
+      expect(confirmedPayment.fromAddress, '0xSenderB');
       expect(confirmedPayment.amountBaseUnits, '15000000000000000000');
       expect(confirmedPayment.txHash,
           '0x1111111111111111111111111111111111111111111111111111111111111111');
@@ -530,6 +532,29 @@ void main() {
       expect(confirmedPayment.blockTimestamp,
           DateTime.parse('2026-08-11T10:00:00Z'));
       expect(intent.toJson()['confirmed_payments'], [receipt]);
+    });
+
+    test('keeps sender additive for older confirmed payment payloads', () {
+      final receipt = _confirmedPaymentJson(
+        chainId: 137,
+        txHash:
+            '0x2222222222222222222222222222222222222222222222222222222222222222',
+        logIndex: 1,
+        blockTimestamp: '2026-08-11T10:00:00Z',
+      )..remove('from_address');
+
+      final intent = PaymentIntent.fromJson(_paymentIntentJson(
+        status: 'completed',
+        paymentOptions: [],
+        payer: _payerJson(address: '0xHolderA'),
+        confirmedPayments: [receipt],
+      ));
+
+      expect(intent.payer?.address, '0xHolderA');
+      expect(intent.confirmedPayments.single.fromAddress, isNull);
+      expect(intent.toJson()['confirmed_payments'], [
+        {...receipt, 'from_address': null},
+      ]);
     });
 
     test('round-trips multiple confirmed payments in API order', () {
@@ -777,26 +802,42 @@ void main() {
       expect(updated.payer?.point.authorization.amount, '100');
     });
 
-    test('submits transaction hash to action URL', () async {
+    test('submits connected wallet B only as optional proof response context',
+        () async {
       final requests = <http.Request>[];
       final client = MisePayClient(
         allowedOrigins: {'https://api-dev.misepay.app'},
         httpClient: MockClient((request) async {
           requests.add(request);
           return _jsonResponse(
-            {..._paymentIntentJson(payer: _payerJson()), 'status': 'pending'},
+            _paymentIntentJson(
+              payer: _payerJson(address: '0xHolderA'),
+              status: 'completed',
+              paymentOptions: [],
+              confirmedPayments: [
+                _confirmedPaymentJson(
+                  chainId: 137,
+                  fromAddress: '0xSenderB',
+                  txHash: '0xtx',
+                  logIndex: 4,
+                  blockTimestamp: '2026-08-11T10:00:00Z',
+                ),
+              ],
+            ),
             statusCode: 202,
           );
         }),
       );
-      final intent =
-          PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
+      final intent = PaymentIntent.fromJson(
+        _paymentIntentJson(payer: _payerJson(address: '0xHolderA')),
+      );
 
       final updated = await client.paymentIntents.provePayment(
         paymentIntent: intent,
         chainId: 137,
         tokenAddress: '0xJPYCPolygon',
         txHash: '0xtx',
+        payerAddress: '0xConnectedB',
       );
 
       expect(requests.single.url.toString(),
@@ -805,22 +846,28 @@ void main() {
         'chain_id': 137,
         'token_address': '0xJPYCPolygon',
         'tx_hash': '0xtx',
-        'payer_address': '0xabc',
+        'payer_address': '0xConnectedB',
       });
-      expect(updated.status, PaymentIntentStatus.pending);
+      expect(updated.payer?.address, '0xHolderA');
+      expect(updated.confirmedPayments.single.fromAddress, '0xSenderB');
     });
 
-    test('omits proof payer context when the PaymentIntent has no payer',
+    test('does not infer proof payer context from the bound point holder',
         () async {
       final requests = <http.Request>[];
       final client = MisePayClient(
         allowedOrigins: {'https://api-dev.misepay.app'},
         httpClient: MockClient((request) async {
           requests.add(request);
-          return _jsonResponse(_paymentIntentJson(), statusCode: 202);
+          return _jsonResponse(
+            _paymentIntentJson(payer: _payerJson(address: '0xHolderA')),
+            statusCode: 202,
+          );
         }),
       );
-      final intent = PaymentIntent.fromJson(_paymentIntentJson());
+      final intent = PaymentIntent.fromJson(
+        _paymentIntentJson(payer: _payerJson(address: '0xHolderA')),
+      );
 
       await client.paymentIntents.provePayment(
         paymentIntent: intent,
@@ -1109,12 +1156,14 @@ Map<String, dynamic> _confirmedPaymentJson({
   required String txHash,
   required int logIndex,
   required String blockTimestamp,
+  String fromAddress = '0xSender',
 }) =>
     {
       'chain_id': chainId,
       'asset_symbol': 'JPYC',
       'asset_decimals': 18,
       'token_address': '0x409eToken',
+      'from_address': fromAddress,
       'amount_base_units': '15000000000000000000',
       'tx_hash': txHash,
       'log_index': logIndex,
