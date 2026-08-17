@@ -22,5 +22,6 @@ abstract interface class PaymentIntentRepository {
     required int chainId,
     required String tokenAddress,
     required String txHash,
+    String? payerAddress,
   });
 }

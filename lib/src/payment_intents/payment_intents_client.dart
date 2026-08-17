@@ -59,17 +59,22 @@ class PaymentIntentsClient {
   }
 
   /// Submits an on-chain payment transaction hash to [paymentIntent]'s action URL.
+  ///
+  /// [payerAddress] is optional response-rendering context. It is not verified
+  /// sender evidence and is independent of the PaymentIntent point holder.
   Future<PaymentIntent> provePayment({
     required PaymentIntent paymentIntent,
     required int chainId,
     required String tokenAddress,
     required String txHash,
+    String? payerAddress,
   }) {
     return _repository.submitTransactionHash(
       intent: paymentIntent,
       chainId: chainId,
       tokenAddress: tokenAddress,
       txHash: txHash,
+      payerAddress: payerAddress,
     );
   }
 }

@@ -6,6 +6,7 @@ class ConfirmedPayment {
     required this.assetSymbol,
     required this.assetDecimals,
     required this.tokenAddress,
+    this.fromAddress,
     required this.amountBaseUnits,
     required this.txHash,
     required this.logIndex,
@@ -19,6 +20,7 @@ class ConfirmedPayment {
       assetSymbol: json['asset_symbol'] as String,
       assetDecimals: json['asset_decimals'] as int,
       tokenAddress: json['token_address'] as String,
+      fromAddress: json['from_address'] as String?,
       amountBaseUnits: json['amount_base_units'] as String,
       txHash: json['tx_hash'] as String,
       logIndex: json['log_index'] as int,
@@ -37,6 +39,9 @@ class ConfirmedPayment {
 
   /// Token contract address used by the transfer.
   final String tokenAddress;
+
+  /// Verified ERC-20 sender address when supplied by the API.
+  final String? fromAddress;
 
   /// Exact token amount in base units.
   ///
@@ -59,6 +64,7 @@ class ConfirmedPayment {
       'asset_symbol': assetSymbol,
       'asset_decimals': assetDecimals,
       'token_address': tokenAddress,
+      'from_address': fromAddress,
       'amount_base_units': amountBaseUnits,
       'tx_hash': txHash,
       'log_index': logIndex,

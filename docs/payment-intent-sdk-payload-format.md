@@ -34,6 +34,7 @@ await misepayClient.paymentIntents.provePayment(
   chainId: selectedOption.chainId,
   tokenAddress: selectedOption.tokenAddress,
   txHash: txHash,
+  payerAddress: connectedWalletAddress,
 );
 ```
 
@@ -45,6 +46,7 @@ await misepayClient.paymentIntents.provePayment(
 - The SDK validates the `requestUri` origin against built-in production settings unless trusted override settings or permissive origin mode are provided.
 - The SDK validates origin only, not path. The backend route remains opaque to the SDK.
 - If `payerAddress` is provided, the SDK appends `payer_address` to the initial GET URL.
+- `PaymentIntent.payer` is canonical point-holder context, not connected-wallet state. Once A is bound, switching the app wallet to B does not replace A.
 - Follow-up API calls MUST use response `actions` URLs.
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.
 - The SDK accepts PaymentIntent payload version `1` and rejects any other version with `UNSUPPORTED_PAYMENT_INTENT_VERSION` before using payment instructions or actions.
@@ -66,10 +68,14 @@ await misepayClient.paymentIntents.provePayment(
 - If current point amount is already `0`, cancellation is a no-op and should not submit.
 - On submission, the backend locks canonical state and recomputes current remaining value, available point balance, benefit, net amount, and settlement base units before reserving points.
 - A signature remains usable after verified payment state changes only while its exact point amount is within the current remaining value.
+- The same holder may change the pending total target, including zero. Another wallet cannot edit it, and clearing to zero releases value without unbinding the holder.
+- `provePayment.payerAddress` is optional response-rendering context. The SDK does not infer it from `PaymentIntent.payer`, and neither client nor synchronous API treats it as verified `tx.from`.
+- Verified token sender identity comes only from `confirmed_payments[].from_address` after worker/scanner verification of ERC-20 `Transfer.from`.
+- After broadcast, proof errors authorize retrying the same hash and polling only; they never authorize resending token funds.
 
 ## PaymentIntent Response Shape
 
-Without `payerAddress`, the canonical resource explicitly contains
+When no point holder is bound, omitting `payerAddress` produces an explicit
 `"payer": null`:
 
 ```json
@@ -102,6 +108,7 @@ Without `payerAddress`, the canonical resource explicitly contains
       "amount_base_units": "3000000000000000000000"
     }
   ],
+  "confirmed_payments": [],
   "actions": {
     "submit_point_authorization": "https://api.misepay.app/v1/payment-intents/pi_123/benefits",
     "submit_payment_proof": "https://api.misepay.app/v1/payment-intents/pi_123/payment-proofs"
@@ -113,8 +120,9 @@ Without `payerAddress`, the canonical resource explicitly contains
 }
 ```
 
-With `payerAddress`, the same resource contains the payer-specific point
-balance and authorization values:
+When no holder is bound, supplying `payerAddress` requests preview balance and
+authorization values. Once A authorizes points, the same shape remains bound to
+A even when connected wallet B supplies later query or proof context:
 
 ```json
 {
@@ -157,6 +165,7 @@ balance and authorization values:
       "amount_base_units": "1800000000000000000000"
     }
   ],
+  "confirmed_payments": [],
   "actions": {
     "submit_point_authorization": "https://api.misepay.app/v1/payment-intents/pi_123/benefits",
     "submit_payment_proof": "https://api.misepay.app/v1/payment-intents/pi_123/payment-proofs"
@@ -191,6 +200,42 @@ the field is absent. Terminal UI uses `completedAt` only for `completed` and
 `cancelledAt` only for `cancelled`; it does not infer a missing event time from
 another timestamp. The SDK keeps Store and Merchant images separate so wallet
 UI can retry the Merchant image when the Store image is absent or fails to load.
+
+On token completion, `confirmed_payments` contains allowlisted verified receipt
+evidence. `from_address` is additive in the SDK model and parses as nullable for
+older backend environments, but a current API receipt supplies it from the
+canonical Transaction:
+
+```json
+{
+  "payer": {
+    "address": "0xHolderA...",
+    "point": {
+      "label": "MisePay Points",
+      "balance": { "available": "5000" },
+      "authorization": { "amount": "1200", "max_amount": "3000", "revision": 1 }
+    }
+  },
+  "confirmed_payments": [
+    {
+      "chain_id": 137,
+      "asset_symbol": "JPYC",
+      "asset_decimals": 18,
+      "token_address": "0xJPYCPolygon...",
+      "from_address": "0xSenderB...",
+      "amount_base_units": "3000000000000000000000",
+      "tx_hash": "0x...",
+      "log_index": 4,
+      "block_timestamp": "2026-08-11T10:00:00Z"
+    }
+  ]
+}
+```
+
+This separation is intentional: A owns point consent and B funded the verified
+token transfer. Full or surplus token coverage releases A's active reservation
+and completes the PaymentIntent; it does not cancel the paid intent. Accepted
+and reward value remain capped at gross, while the backend records surplus.
 
 ## EIP-712 Typed Data
 
@@ -246,9 +291,14 @@ The payer selects a total target of `1200` point units at revision `1` for `pi_1
   "chain_id": 137,
   "token_address": "0xJPYCPolygon...",
   "tx_hash": "0x...",
-  "payer_address": "0xabc..."
+  "payer_address": "0xConnectedWallet..."
 }
 ```
+
+`payer_address` is optional and exists only so the `202 Accepted` response can
+render useful wallet context when no holder is bound. At request time the API
+does not fetch the transaction receipt, validate this address against A, or use
+it as sender evidence. Omitting it does not change verification or settlement.
 
 ## Actions
 
