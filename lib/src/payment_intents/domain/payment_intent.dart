@@ -7,6 +7,7 @@ import 'payment_intent_actions.dart';
 import 'payment_intent_status.dart';
 import 'payment_option.dart';
 import 'store.dart';
+import 'utc_timestamp.dart';
 
 /// Typed PaymentIntent response returned by the MisePay API.
 class PaymentIntent {
@@ -140,22 +141,13 @@ class PaymentIntent {
       'confirmed_payments':
           confirmedPayments.map((payment) => payment.toJson()).toList(),
       'actions': actions.toJson(),
-      'created_at': createdAt == null ? null : _formatUtcTimestamp(createdAt!),
+      'created_at': createdAt == null ? null : formatUtcTimestamp(createdAt!),
       'completed_at':
-          completedAt == null ? null : _formatUtcTimestamp(completedAt!),
+          completedAt == null ? null : formatUtcTimestamp(completedAt!),
       'cancelled_at':
-          cancelledAt == null ? null : _formatUtcTimestamp(cancelledAt!),
-      'expires_at': _formatUtcTimestamp(expiresAt),
+          cancelledAt == null ? null : formatUtcTimestamp(cancelledAt!),
+      'expires_at': formatUtcTimestamp(expiresAt),
       'payer': payer?.toJson(),
     };
   }
-}
-
-String _formatUtcTimestamp(DateTime value) {
-  final utc = value.toUtc();
-  final timestamp = utc.toIso8601String();
-  if (utc.millisecond == 0 && utc.microsecond == 0) {
-    return timestamp.replaceFirst('.000Z', 'Z');
-  }
-  return timestamp;
 }

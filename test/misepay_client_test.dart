@@ -479,6 +479,69 @@ void main() {
       expect(intent.toJson()['order_id'], isNull);
     });
 
+    test('parses and serializes payer point expiry and pending reward context',
+        () {
+      final payer = _payerJson();
+      final point = payer['point'] as Map<String, dynamic>;
+      point['expiring_soon_lot'] = {
+        'amount': '21000',
+        'expires_at': '2026-10-15T00:00:00Z',
+      };
+      point['pending_reward'] = {
+        'amount': '920',
+        'available_at': '2026-11-25T12:02:00Z',
+      };
+
+      final intent = PaymentIntent.fromJson(_paymentIntentJson(payer: payer));
+
+      expect(intent.payer?.point.expiringSoonLot?.amount, '21000');
+      expect(
+        intent.payer?.point.expiringSoonLot?.expiresAt,
+        DateTime.parse('2026-10-15T00:00:00Z'),
+      );
+      expect(intent.payer?.point.pendingReward?.amount, '920');
+      expect(
+        intent.payer?.point.pendingReward?.availableAt,
+        DateTime.parse('2026-11-25T12:02:00Z'),
+      );
+      expect(intent.toJson()['payer'], payer);
+    });
+
+    test(
+        'accepts absent and null payer point display context for staggered rollout',
+        () {
+      final absentPayer = _payerJson();
+      final absentPoint = Map<String, dynamic>.from(
+        absentPayer['point'] as Map<String, dynamic>,
+      );
+      absentPayer['point'] = absentPoint;
+      absentPoint.remove('expiring_soon_lot');
+      absentPoint.remove('pending_reward');
+      final nullPayer = _payerJson();
+      final nullPoint = Map<String, dynamic>.from(
+        nullPayer['point'] as Map<String, dynamic>,
+      );
+      nullPayer['point'] = nullPoint;
+      nullPoint['expiring_soon_lot'] = null;
+      nullPoint['pending_reward'] = null;
+
+      final absentIntent =
+          PaymentIntent.fromJson(_paymentIntentJson(payer: absentPayer));
+      final nullIntent =
+          PaymentIntent.fromJson(_paymentIntentJson(payer: nullPayer));
+
+      expect(absentIntent.payer?.point.expiringSoonLot, isNull);
+      expect(absentIntent.payer?.point.pendingReward, isNull);
+      expect(nullIntent.payer?.point.expiringSoonLot, isNull);
+      expect(nullIntent.payer?.point.pendingReward, isNull);
+      expect(
+          (absentIntent.toJson()['payer'] as Map<String, dynamic>)['point'], {
+        ...absentPoint,
+        'expiring_soon_lot': null,
+        'pending_reward': null,
+      });
+    });
+
     test('defaults missing confirmed payment history to an empty list', () {
       final json = _paymentIntentJson()..remove('confirmed_payments');
 
@@ -699,6 +762,16 @@ void main() {
     test('round-trips typed response models to JSON', () {
       final json = _paymentIntentJson(payer: _payerJson());
       final intent = PaymentIntent.fromJson(json);
+      final expectedPayer = Map<String, dynamic>.from(
+        json['payer'] as Map<String, dynamic>,
+      );
+      final expectedPoint = Map<String, dynamic>.from(
+        expectedPayer['point'] as Map<String, dynamic>,
+      );
+      expectedPayer['point'] = expectedPoint;
+      expectedPoint['expiring_soon_lot'] = null;
+      expectedPoint['pending_reward'] = null;
+      json['payer'] = expectedPayer;
 
       expect(intent.toJson(), json);
     });
