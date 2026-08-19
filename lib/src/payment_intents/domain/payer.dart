@@ -1,3 +1,5 @@
+import 'utc_timestamp.dart';
+
 /// Payer-specific context returned when a PaymentIntent is fetched with a payer.
 class Payer {
   /// Creates an immutable payer context.
@@ -29,6 +31,7 @@ class PayerPoint {
     required this.label,
     required this.balance,
     required this.authorization,
+    this.expiringSoonLot,
   });
 
   /// Parses point context from API JSON.
@@ -37,6 +40,10 @@ class PayerPoint {
         balance: PointBalance.fromJson(json['balance'] as Map<String, dynamic>),
         authorization: PointAuthorizationContext.fromJson(
             json['authorization'] as Map<String, dynamic>),
+        expiringSoonLot: json['expiring_soon_lot'] == null
+            ? null
+            : PointExpiringSoonLot.fromJson(
+                json['expiring_soon_lot'] as Map<String, dynamic>),
       );
 
   /// Display label for the point program.
@@ -48,11 +55,40 @@ class PayerPoint {
   /// Point authorization values for this PaymentIntent.
   final PointAuthorizationContext authorization;
 
+  /// Earliest-expiring usable point lot while the PaymentIntent is pending.
+  final PointExpiringSoonLot? expiringSoonLot;
+
   /// Serializes this value back to API-shaped JSON.
   Map<String, dynamic> toJson() => {
         'label': label,
         'balance': balance.toJson(),
         'authorization': authorization.toJson(),
+        'expiring_soon_lot': expiringSoonLot?.toJson(),
+      };
+}
+
+/// Remaining amount and expiry of the payer's earliest-expiring usable lot.
+class PointExpiringSoonLot {
+  /// Creates immutable expiring point-lot display context.
+  const PointExpiringSoonLot({required this.amount, required this.expiresAt});
+
+  /// Parses point-lot display context from API JSON.
+  factory PointExpiringSoonLot.fromJson(Map<String, dynamic> json) =>
+      PointExpiringSoonLot(
+        amount: json['amount'] as String,
+        expiresAt: DateTime.parse(json['expires_at'] as String),
+      );
+
+  /// Remaining points in the lot represented as an integer string.
+  final String amount;
+
+  /// UTC time when the lot expires.
+  final DateTime expiresAt;
+
+  /// Serializes this value back to API-shaped JSON.
+  Map<String, dynamic> toJson() => {
+        'amount': amount,
+        'expires_at': formatUtcTimestamp(expiresAt),
       };
 }
 

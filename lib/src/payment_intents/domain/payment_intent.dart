@@ -1,12 +1,14 @@
 import '../../core/misepay_exception.dart';
 import 'amount_summary.dart';
 import 'confirmed_payment.dart';
+import 'reward.dart';
 import 'merchant.dart';
 import 'payer.dart';
 import 'payment_intent_actions.dart';
 import 'payment_intent_status.dart';
 import 'payment_option.dart';
 import 'store.dart';
+import 'utc_timestamp.dart';
 
 /// Typed PaymentIntent response returned by the MisePay API.
 class PaymentIntent {
@@ -28,6 +30,7 @@ class PaymentIntent {
     this.completedAt,
     this.cancelledAt,
     this.payer,
+    this.reward,
   });
 
   /// Parses a PaymentIntent from API JSON.
@@ -51,6 +54,9 @@ class PaymentIntent {
       payer: json['payer'] == null
           ? null
           : Payer.fromJson(json['payer'] as Map<String, dynamic>),
+      reward: json['reward'] == null
+          ? null
+          : Reward.fromJson(json['reward'] as Map<String, dynamic>),
       amount: AmountSummary.fromJson(json['amount'] as Map<String, dynamic>),
       paymentOptions: (json['payment_options'] as List<dynamic>)
           .map((option) =>
@@ -100,6 +106,9 @@ class PaymentIntent {
   /// Payer-specific point context, present only when fetched with payer data.
   final Payer? payer;
 
+  /// Pending reward assigned to the verified token payer after completion.
+  final Reward? reward;
+
   /// Gross, benefit, and net amount summary.
   final AmountSummary amount;
 
@@ -140,22 +149,14 @@ class PaymentIntent {
       'confirmed_payments':
           confirmedPayments.map((payment) => payment.toJson()).toList(),
       'actions': actions.toJson(),
-      'created_at': createdAt == null ? null : _formatUtcTimestamp(createdAt!),
+      'created_at': createdAt == null ? null : formatUtcTimestamp(createdAt!),
       'completed_at':
-          completedAt == null ? null : _formatUtcTimestamp(completedAt!),
+          completedAt == null ? null : formatUtcTimestamp(completedAt!),
       'cancelled_at':
-          cancelledAt == null ? null : _formatUtcTimestamp(cancelledAt!),
-      'expires_at': _formatUtcTimestamp(expiresAt),
+          cancelledAt == null ? null : formatUtcTimestamp(cancelledAt!),
+      'expires_at': formatUtcTimestamp(expiresAt),
       'payer': payer?.toJson(),
+      'reward': reward?.toJson(),
     };
   }
-}
-
-String _formatUtcTimestamp(DateTime value) {
-  final utc = value.toUtc();
-  final timestamp = utc.toIso8601String();
-  if (utc.millisecond == 0 && utc.microsecond == 0) {
-    return timestamp.replaceFirst('.000Z', 'Z');
-  }
-  return timestamp;
 }

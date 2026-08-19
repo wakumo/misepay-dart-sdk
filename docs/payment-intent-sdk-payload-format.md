@@ -57,6 +57,8 @@ await misepayClient.paymentIntents.provePayment(
 - Wallet UI owns image selection and load-error fallback in Store, Merchant, local-placeholder order. The SDK does not select a fallback or probe image URLs with HTTP `HEAD` requests.
 - Point identity is backend-owned as `merchant_id + point_type + holder_address`. For the POC, `point_type` has a single backend default value. The SDK/app sends only `payerAddress`; it does not send or choose `point_type`.
 - Payment chain is not part of point identity.
+- `payer.point.expiring_soon_lot` is nullable and maps to `PayerPoint.expiringSoonLot`. While an intent is `pending`, it contains only the remaining integer-string amount and expiry of the payer's earliest-expiring usable lot; it is `null` when no such lot exists and never includes a point-lot ID.
+- Top-level `reward` is nullable and maps to `PaymentIntent.reward`. After completed token settlement creates a future pending reward lot, it contains the persisted reward recipient, integer-string amount, literal `pending` status, and availability time. Wallet A can remain `payer.address` for historical point context while verified token payer B is `reward.recipient_address`.
 - EIP-712 domain salt labels are derived from the SDK environment, not from app input, the link, or the API response. The configured labels are `misepay:prod` for production and `misepay:dev` for development. Before signing, `typedData.domain.salt` is set to `keccak256(UTF-8(label))` as a lowercase, `0x`-prefixed bytes32.
 - `pointAmount` is a non-negative integer point string where `1 point = 1 JPY`; it is never scaled using token decimals.
 - `amount.gross`, `amount.benefit`, and `amount.net` are backend-derived display/accounting values and are not part of point consent.
@@ -145,9 +147,14 @@ A even when connected wallet B supplies later query or proof context:
         "amount": "0",
         "max_amount": "3000",
         "revision": 0
+      },
+      "expiring_soon_lot": {
+        "amount": "21000",
+        "expires_at": "2026-10-15T00:00:00Z"
       }
     }
   },
+  "reward": null,
   "amount": {
     "currency": "JPY",
     "gross": "3000",
@@ -184,6 +191,13 @@ as `authorization.maxAmount`. Both fields are required whenever `payer` is not
 null. The maximum is the total authorization target for the current snapshot,
 not an incremental allowance. Internal `reserved`, `consumed`, and `released`
 benefit statuses remain backend-only.
+
+`expiring_soon_lot` and top-level `reward` are optional display
+projections. The SDK parses either an absent or explicit null value as null and
+serializes them as `expiring_soon_lot` and `reward`. They are never
+signed, never sent in an authorization or proof request, and do not replace
+payment receipts or the point ledger. `reward.recipient_address` comes
+from persisted settlement truth, not the optional proof `payerAddress`.
 
 Initial fetches, polling responses, and action responses use this same resource
 shape. Replace local state with each returned PaymentIntent and use its
