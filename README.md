@@ -80,8 +80,10 @@ paymentIntent.payer?.point.authorization.maxAmount;
 paymentIntent.payer?.point.authorization.revision;
 paymentIntent.payer?.point.expiringSoonLot?.amount;
 paymentIntent.payer?.point.expiringSoonLot?.expiresAt;
-paymentIntent.payer?.point.pendingReward?.amount;
-paymentIntent.payer?.point.pendingReward?.availableAt;
+paymentIntent.reward?.recipientAddress;
+paymentIntent.reward?.amount;
+paymentIntent.reward?.status;
+paymentIntent.reward?.availableAt;
 paymentIntent.paymentOptions.first.chainName;
 paymentIntent.paymentOptions.first.amountBaseUnits;
 ```
@@ -114,10 +116,10 @@ even if connected wallet B supplies a query or proof context:
       "expiring_soon_lot": {
         "amount": "21000",
         "expires_at": "2026-10-15T00:00:00Z"
-      },
-      "pending_reward": null
+      }
     }
-  }
+  },
+  "reward": null
 }
 ```
 
@@ -137,12 +139,13 @@ checkout presentation, try a nonblank Store image first, then a nonblank
 Merchant image, then a local placeholder. Handle image load errors directly;
 do not issue HTTP `HEAD` requests to probe whether an image URL exists.
 
-`payer.point.expiringSoonLot` and `payer.point.pendingReward` are also nullable
-additive context. During a pending checkout, `expiringSoonLot` is the payer's
+`payer.point.expiringSoonLot` and top-level `reward` are nullable additive
+context. During a pending checkout, `expiringSoonLot` is the point holder's
 earliest-expiring usable lot and its remaining integer-string amount. After a
-completed token-funded payment, `pendingReward` is the payer-owned Order reward
-and its availability time. Do not show a reward for another holder, and do not
-treat either display value as a ledger identifier or a payment amount.
+completed token-funded payment, `reward` identifies the verified token
+payer who earned the pending Order reward. Wallet A can remain the historical
+point holder while wallet B is `reward.recipientAddress`. Neither display
+projection is a ledger identifier or payment amount.
 
 Serialize typed response data when you need to cache, log, debug, or pass data across app layers:
 
@@ -175,8 +178,9 @@ available for UI rendering, while `paymentOptions` is empty and both action
 URLs are `null`. `paymentOptions` describes routes that can be used now; never
 retain or reuse it as historical evidence after completion. Read the actual
 verified token transfer from `confirmedPayments` instead. For a completed
-receipt, render `payer?.point.pendingReward` only when non-null; terminal
-intents have `expiringSoonLot == null`.
+receipt, render `reward` only when non-null and match its recipient to the
+connected wallet when presenting personal copy; terminal intents have
+`expiringSoonLot == null`.
 
 ```dart
 if (current.status == PaymentIntentStatus.completed) {
