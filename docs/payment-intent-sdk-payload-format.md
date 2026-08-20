@@ -46,7 +46,7 @@ await misepayClient.paymentIntents.provePayment(
 - The SDK validates the `requestUri` origin against built-in production settings unless trusted override settings or permissive origin mode are provided.
 - The SDK validates origin only, not path. The backend route remains opaque to the SDK.
 - If `payerAddress` is provided, the SDK appends `payer_address` to the initial GET URL.
-- `PaymentIntent.payer` is canonical point-holder context, not connected-wallet state. Once A is bound, switching the app wallet to B does not replace A.
+- `PaymentIntent.points` is canonical point context. `PaymentIntent.payer` is a nullable legacy projection during the compatibility window; neither is connected-wallet state. Once A is bound, switching the app wallet to B does not replace A.
 - Follow-up API calls MUST use response `actions` URLs.
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.
 - The SDK accepts PaymentIntent payload version `1` and rejects any other version with `UNSUPPORTED_PAYMENT_INTENT_VERSION` before using payment instructions or actions.
@@ -57,11 +57,11 @@ await misepayClient.paymentIntents.provePayment(
 - Wallet UI owns image selection and load-error fallback in Store, Merchant, local-placeholder order. The SDK does not select a fallback or probe image URLs with HTTP `HEAD` requests.
 - Point identity is backend-owned as `merchant_id + point_type + holder_address`. For the POC, `point_type` has a single backend default value. The SDK/app sends only `payerAddress`; it does not send or choose `point_type`.
 - Payment chain is not part of point identity.
-- `payer.point.expiring_soon_lot` is nullable and maps to `PayerPoint.expiringSoonLot`. While an intent is `pending`, it contains only the remaining integer-string amount and expiry of the payer's earliest-expiring usable lot; it is `null` when no such lot exists and never includes a point-lot ID.
-- Top-level `reward` is nullable and maps to `PaymentIntent.reward`. After completed token settlement creates a future pending reward lot, it contains the persisted reward recipient, integer-string amount, literal `pending` status, and availability time. Wallet A can remain `payer.address` for historical point context while verified token payer B is `reward.recipient_address`.
+- `PaymentIntent.points` is nullable for staggered rollout. `points.account` is a pending-only live snapshot with `holder_address`, `available_balance`, and nullable `expiring_soon_lot`; `points.authorization` always carries a pending holder's amount, nullable `maximum_amount`, and revision. Before first submission it has amount `"0"`, revision `0`, and null status; afterward status is `reserved`, `consumed`, or `released`.
+- Top-level `reward` is nullable and maps to `PaymentIntent.reward`. After completed token settlement creates a future pending reward lot, it contains the persisted reward recipient, integer-string amount, literal `pending` status, and availability time. A remains `points.authorization.holderAddress` while verified token payer B is `confirmedPayments[].fromAddress` and, when present, `reward.recipientAddress`.
 - EIP-712 domain salt labels are derived from the SDK environment, not from app input, the link, or the API response. The configured labels are `misepay:prod` for production and `misepay:dev` for development. Before signing, `typedData.domain.salt` is set to `keccak256(UTF-8(label))` as a lowercase, `0x`-prefixed bytes32.
 - `pointAmount` is a non-negative integer point string where `1 point = 1 JPY`; it is never scaled using token decimals.
-- `amount.gross`, `amount.benefit`, and `amount.net` are backend-derived display/accounting values and are not part of point consent.
+- `amount.gross`, `amount.benefit`, `amount.net`, `amount.pointDiscount`, and `amount.tokenDue` are backend-derived display/accounting values and are not part of point consent. `pointDiscount == benefit` and `tokenDue == net`.
 - Each `payment_options[].amount_base_units` is the current expected token payment in token base units, scaled using that asset's decimals.
 - Point authorization is independent of chain and payment option. The SDK needs no settlement option to construct it.
 - The single EIP-712 domain version `1` message signs `intentId`, `payer`, `pointAmount`, `authorizationRevision`, and `expiresAt`. The SDK signs the current response revision plus one; the first authorization therefore uses revision `1`.
@@ -71,14 +71,14 @@ await misepayClient.paymentIntents.provePayment(
 - On submission, the backend locks canonical state and recomputes current remaining value, available point balance, benefit, net amount, and settlement base units before reserving points.
 - A signature remains usable after verified payment state changes only while its exact point amount is within the current remaining value.
 - The same holder may change the pending total target, including zero. Another wallet cannot edit it, and clearing to zero releases value without unbinding the holder.
-- `provePayment.payerAddress` is optional response-rendering context. The SDK does not infer it from `PaymentIntent.payer`, and neither client nor synchronous API treats it as verified `tx.from`.
+- `provePayment.payerAddress` is optional response-rendering context. The SDK does not infer it from `PaymentIntent.payer` or `PaymentIntent.points`, and neither client nor synchronous API treats it as verified `tx.from`.
 - Verified token sender identity comes only from `confirmed_payments[].from_address` after worker/scanner verification of ERC-20 `Transfer.from`.
 - After broadcast, proof errors authorize retrying the same hash and polling only; they never authorize resending token funds.
 
 ## PaymentIntent Response Shape
 
-When no point holder is bound, omitting `payerAddress` produces an explicit
-`"payer": null`:
+When no point holder is bound, omitting `payerAddress` produces explicit
+`"points": null` and legacy `"payer": null`:
 
 ```json
 {
@@ -92,12 +92,15 @@ When no point holder is bound, omitting `payerAddress` produces an explicit
     "image_url": "https://cdn.example.com/merchants/cafe-abc.jpg"
   },
   "store": { "name": "Shibuya Store", "image_url": null },
+  "points": null,
   "payer": null,
   "amount": {
     "currency": "JPY",
     "gross": "3000",
     "benefit": "0",
-    "net": "3000"
+    "net": "3000",
+    "point_discount": "0",
+    "token_due": "3000"
   },
   "payment_options": [
     {

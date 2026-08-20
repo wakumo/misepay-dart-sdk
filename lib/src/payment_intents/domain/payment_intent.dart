@@ -4,6 +4,7 @@ import 'confirmed_payment.dart';
 import 'reward.dart';
 import 'merchant.dart';
 import 'payer.dart';
+import 'payment_intent_points.dart';
 import 'payment_intent_actions.dart';
 import 'payment_intent_status.dart';
 import 'payment_option.dart';
@@ -30,6 +31,7 @@ class PaymentIntent {
     this.completedAt,
     this.cancelledAt,
     this.payer,
+    this.points,
     this.reward,
   });
 
@@ -54,6 +56,10 @@ class PaymentIntent {
       payer: json['payer'] == null
           ? null
           : Payer.fromJson(json['payer'] as Map<String, dynamic>),
+      points: json['points'] == null
+          ? null
+          : PaymentIntentPoints.fromJson(
+              json['points'] as Map<String, dynamic>),
       reward: json['reward'] == null
           ? null
           : Reward.fromJson(json['reward'] as Map<String, dynamic>),
@@ -106,6 +112,9 @@ class PaymentIntent {
   /// Payer-specific point context, present only when fetched with payer data.
   final Payer? payer;
 
+  /// Canonical point account and authorization context.
+  final PaymentIntentPoints? points;
+
   /// Pending reward assigned to the verified token payer after completion.
   final Reward? reward;
 
@@ -156,6 +165,7 @@ class PaymentIntent {
           cancelledAt == null ? null : formatUtcTimestamp(cancelledAt!),
       'expires_at': formatUtcTimestamp(expiresAt),
       'payer': payer?.toJson(),
+      'points': points?.toJson(),
       'reward': reward?.toJson(),
     };
   }

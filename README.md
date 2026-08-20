@@ -74,12 +74,16 @@ paymentIntent.store.name;
 paymentIntent.store.imageUrl;
 paymentIntent.amount.gross;
 paymentIntent.amount.net;
-paymentIntent.payer?.point.balance.available;
-paymentIntent.payer?.point.authorization.amount;
-paymentIntent.payer?.point.authorization.maxAmount;
-paymentIntent.payer?.point.authorization.revision;
-paymentIntent.payer?.point.expiringSoonLot?.amount;
-paymentIntent.payer?.point.expiringSoonLot?.expiresAt;
+paymentIntent.amount.pointDiscount;
+paymentIntent.amount.tokenDue;
+paymentIntent.points?.account?.availableBalance;
+paymentIntent.points?.account?.expiringSoonLot?.amount;
+paymentIntent.points?.authorization?.holderAddress;
+paymentIntent.points?.authorization?.amount;
+paymentIntent.points?.authorization?.maximumAmount;
+paymentIntent.points?.authorization?.revision;
+paymentIntent.points?.authorization?.status;
+paymentIntent.payer; // Nullable legacy projection during the compatibility window.
 paymentIntent.reward?.recipientAddress;
 paymentIntent.reward?.amount;
 paymentIntent.reward?.status;
@@ -89,17 +93,19 @@ paymentIntent.paymentOptions.first.amountBaseUnits;
 ```
 
 When no point holder is bound and the PaymentIntent is fetched without
-`payerAddress`, the backend returns an explicit null payer context:
+`payerAddress`, the backend returns explicit null point and legacy payer context:
 
 ```json
 {
+  "points": null,
   "payer": null
 }
 ```
 
 When no holder is bound, `payerAddress` requests non-persisted preview context.
-After A authorizes points, the backend returns A as the canonical point context
-even if connected wallet B supplies a query or proof context:
+After A authorizes points, `points` is canonical and identifies A even if
+connected wallet B supplies a query or proof context. `payer` remains a legacy
+nullable projection of the prior shape:
 
 ```json
 {
@@ -119,16 +125,35 @@ even if connected wallet B supplies a query or proof context:
       }
     }
   },
+  "points": {
+    "account": {
+      "holder_address": "0xabc...",
+      "label": "MisePay Points",
+      "available_balance": "5000",
+      "expiring_soon_lot": {
+        "amount": "21000",
+        "expires_at": "2026-10-15T00:00:00Z"
+      }
+    },
+    "authorization": {
+      "holder_address": "0xabc...",
+      "amount": "1200",
+      "maximum_amount": "3000",
+      "revision": 1,
+      "status": "reserved"
+    }
+  },
   "reward": null
 }
 ```
 
-`authorization.amount` is the point amount currently associated with this
-PaymentIntent. `authorization.max_amount` is the total target allowed for the
-current backend snapshot, not an additional amount. The SDK exposes the latter
-as `authorization.maxAmount`. Internal benefit lifecycle status is not part of
-the public SDK model. `paymentIntent.payer` is therefore not connected-wallet
-state and must not be overwritten when the wallet provider switches accounts.
+`points.authorization.amount` is `"0"` before first submission and is the
+persisted point target afterward, including after release. `maximum_amount` is
+the total currently selectable target, not an additional amount; it is null on
+terminal PaymentIntents. `points.authorization.status` is null before first
+submission, then `reserved`, `consumed`, or `released`.
+`paymentIntent.payer` is not connected-wallet state and must not be overwritten
+when the wallet provider switches accounts.
 
 `orderId`, `createdAt`, `completedAt`, `cancelledAt`, `merchant.imageUrl`, and
 `store.imageUrl` are nullable so the SDK remains compatible while API
@@ -139,13 +164,13 @@ checkout presentation, try a nonblank Store image first, then a nonblank
 Merchant image, then a local placeholder. Handle image load errors directly;
 do not issue HTTP `HEAD` requests to probe whether an image URL exists.
 
-`payer.point.expiringSoonLot` and top-level `reward` are nullable additive
-context. During a pending checkout, `expiringSoonLot` is the point holder's
-earliest-expiring usable lot and its remaining integer-string amount. After a
-completed token-funded payment, `reward` identifies the verified token
-payer who earned the pending Order reward. Wallet A can remain the historical
-point holder while wallet B is `reward.recipientAddress`. Neither display
-projection is a ledger identifier or payment amount.
+`points.account` and top-level `reward` are nullable additive context. During
+a pending checkout, `points.account.expiringSoonLot` is the holder's
+earliest-expiring usable lot. Terminal PaymentIntents return `points.account`
+as null but retain durable authorization history. After token settlement,
+`confirmedPayments[].fromAddress` identifies verified sender B and `reward`
+identifies B when a pending Order reward exists. Neither display projection is
+a ledger identifier or executable payment amount.
 
 Serialize typed response data when you need to cache, log, debug, or pass data across app layers:
 
@@ -229,7 +254,10 @@ that new URI; never reuse the expired intent URI or rebuild one from the id.
 
 ## Point Authorization
 
-When the payer wants to apply points, build EIP-712 typed data from the full `PaymentIntent`. The full object supplies the intent ID, payer, current authorization amount, maximum authorization target, and expiry. Point authorization is independent of the selected chain or payment option.
+When the payer wants to apply points, build EIP-712 typed data from the full
+`PaymentIntent`. The SDK prefers `points.authorization` and falls back to the
+legacy nullable `payer` projection for compatibility. Point authorization is
+independent of the selected chain or payment option.
 
 ```dart
 final authorization = client.paymentIntents.authorizePoints(
@@ -258,7 +286,7 @@ The single EIP-712 domain version `1` message signs `intentId`, `payer`, the tot
 Keep these unit domains separate:
 
 - `pointAmount` is a non-negative integer point target where `1 point = 1 JPY`; zero clears an existing pending reservation and it is never scaled using token decimals.
-- `paymentIntent.amount.gross`, `benefit`, and `net` are backend-derived display/accounting values.
+- `paymentIntent.amount.gross`, `benefit`, `net`, `pointDiscount`, and `tokenDue` are backend-derived display/accounting values. `pointDiscount == benefit` and `tokenDue == net`.
 - Each payment option's `amountBaseUnits` is an exact settlement-token quantity scaled by that asset's decimals.
 
 The backend locks current PaymentIntent state and recomputes remaining value, balance, benefit, net amount, and settlement base units when the signed authorization is submitted. Do not convert any of these string values to floating point.

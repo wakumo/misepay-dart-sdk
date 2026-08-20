@@ -187,6 +187,56 @@ void main() {
   });
 
   group('PaymentIntentsClient.authorizePoints', () {
+    test(
+        'builds the first point authorization from canonical points without legacy payer',
+        () {
+      final client = MisePayClient();
+      final json = _paymentIntentJson(points: _initialPointsJson())
+        ..remove('payer');
+      final intent = PaymentIntent.fromJson(json);
+
+      final authorization = client.paymentIntents.authorizePoints(
+        paymentIntent: intent,
+        pointAmount: '2',
+      );
+
+      expect(intent.payer, isNull);
+      expect(intent.points?.authorization?.status, isNull);
+      expect(authorization.payerAddress, '0xHolderA');
+      expect(authorization.authorizationRevision, 1);
+      expect(authorization.message, {
+        'intentId': 'pi_123',
+        'payer': '0xHolderA',
+        'pointAmount': '2',
+        'authorizationRevision': '1',
+        'expiresAt': 1783339500,
+      });
+    });
+
+    test(
+        'builds point authorization from canonical points without legacy payer',
+        () {
+      final client = MisePayClient();
+      final json = _paymentIntentJson(points: _pointsJson())..remove('payer');
+      final intent = PaymentIntent.fromJson(json);
+
+      final authorization = client.paymentIntents.authorizePoints(
+        paymentIntent: intent,
+        pointAmount: '2',
+      );
+
+      expect(intent.payer, isNull);
+      expect(authorization.payerAddress, '0xHolderA');
+      expect(authorization.authorizationRevision, 2);
+      expect(authorization.message, {
+        'intentId': 'pi_123',
+        'payer': '0xHolderA',
+        'pointAmount': '2',
+        'authorizationRevision': '2',
+        'expiresAt': 1783339500,
+      });
+    });
+
     test('builds PaymentIntentPointAuthorization typed data', () {
       final client = MisePayClient();
       final intent =
@@ -440,6 +490,34 @@ void main() {
   });
 
   group('PaymentIntent serialization', () {
+    test('parses canonical points and amount aliases without legacy payer', () {
+      final json = _paymentIntentJson(points: _pointsJson())..remove('payer');
+
+      final intent = PaymentIntent.fromJson(json);
+
+      expect(intent.payer, isNull);
+      expect(intent.toJson()['points'], _pointsJson());
+      expect(intent.toJson()['amount'], {
+        'currency': 'JPY',
+        'gross': '10',
+        'benefit': '0',
+        'net': '10',
+        'point_discount': '0',
+        'token_due': '10',
+      });
+    });
+
+    test('accepts absent and null canonical points for staggered rollout', () {
+      final absentJson = _paymentIntentJson()..remove('points');
+      final nullJson = _paymentIntentJson()..['points'] = null;
+
+      final absentIntent = PaymentIntent.fromJson(absentJson);
+      final nullIntent = PaymentIntent.fromJson(nullJson);
+
+      expect(absentIntent.toJson()['points'], isNull);
+      expect(nullIntent.toJson()['points'], isNull);
+    });
+
     test('preserves explicit null payer context', () {
       final intent = PaymentIntent.fromJson(_paymentIntentJson());
 
@@ -509,6 +587,7 @@ void main() {
         intent.reward?.availableAt,
         DateTime.parse('2026-11-25T12:02:00Z'),
       );
+      json['points'] = null;
       expect(intent.toJson(), json);
     });
 
@@ -773,6 +852,7 @@ void main() {
       expectedPayer['point'] = expectedPoint;
       expectedPoint['expiring_soon_lot'] = null;
       json['payer'] = expectedPayer;
+      json['points'] = null;
       json['reward'] = null;
 
       expect(intent.toJson(), json);
@@ -1167,6 +1247,7 @@ http.Response _jsonResponse(Map<String, dynamic> json,
 
 Map<String, dynamic> _paymentIntentJson({
   Map<String, dynamic>? payer,
+  Map<String, dynamic>? points,
   Map<String, dynamic>? actions,
   List<Map<String, dynamic>>? paymentOptions,
   List<Map<String, dynamic>>? confirmedPayments,
@@ -1192,11 +1273,14 @@ Map<String, dynamic> _paymentIntentJson({
     'merchant': {'name': 'Cafe ABC', 'image_url': merchantImageUrl},
     'store': {'name': 'Shibuya Store', 'image_url': storeImageUrl},
     'payer': payer,
+    if (points != null) 'points': points,
     'amount': {
       'currency': 'JPY',
       'gross': gross,
       'benefit': benefit ?? (payer == null ? '0' : '2'),
-      'net': net ?? (payer == null ? gross : '8')
+      'net': net ?? (payer == null ? gross : '8'),
+      'point_discount': benefit ?? (payer == null ? '0' : '2'),
+      'token_due': net ?? (payer == null ? gross : '8'),
     },
     'payment_options': paymentOptions ??
         [
@@ -1262,5 +1346,40 @@ Map<String, dynamic> _payerJson({
           'max_amount': maxAmount,
           'revision': revision
         },
+      },
+    };
+
+Map<String, dynamic> _pointsJson() => {
+      'account': {
+        'holder_address': '0xHolderA',
+        'label': 'MisePay Points',
+        'available_balance': '5',
+        'expiring_soon_lot': {
+          'amount': '5',
+          'expires_at': '2026-10-15T00:00:00Z',
+        },
+      },
+      'authorization': {
+        'holder_address': '0xHolderA',
+        'amount': '1',
+        'maximum_amount': '5',
+        'revision': 1,
+        'status': 'reserved',
+      },
+    };
+
+Map<String, dynamic> _initialPointsJson() => {
+      'account': {
+        'holder_address': '0xHolderA',
+        'label': 'MisePay Points',
+        'available_balance': '5',
+        'expiring_soon_lot': null,
+      },
+      'authorization': {
+        'holder_address': '0xHolderA',
+        'amount': '0',
+        'maximum_amount': '5',
+        'revision': 0,
+        'status': null,
       },
     };
