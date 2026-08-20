@@ -3,7 +3,9 @@ import 'utc_timestamp.dart';
 
 /// Lifecycle status of a reward from a completed token payment.
 enum RewardStatus {
-  pending('pending');
+  pending('pending'),
+  available('available'),
+  voided('voided');
 
   /// Creates a status with its API JSON value.
   const RewardStatus(this.value);
@@ -26,7 +28,7 @@ enum RewardStatus {
   String toJson() => value;
 }
 
-/// Pending reward for the verified token payer of a completed Order.
+/// Reward for the verified token payer of a completed Order.
 class Reward {
   /// Creates immutable reward context.
   const Reward({

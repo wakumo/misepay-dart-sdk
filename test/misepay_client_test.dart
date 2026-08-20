@@ -591,6 +591,21 @@ void main() {
       expect(intent.toJson(), json);
     });
 
+    test('parses an available top-level reward', () {
+      final json = _paymentIntentJson();
+      json['reward'] = {
+        'recipient_address': '0xTokenPayerB',
+        'amount': '920',
+        'status': 'available',
+        'available_at': '2026-11-25T12:02:00Z',
+      };
+
+      final intent = PaymentIntent.fromJson(json);
+
+      expect(intent.reward?.status, RewardStatus.available);
+      expect(intent.toJson(), json);
+    });
+
     test('accepts absent and null reward context for staggered rollout', () {
       final absentPayer = _payerJson();
       final absentPoint = Map<String, dynamic>.from(

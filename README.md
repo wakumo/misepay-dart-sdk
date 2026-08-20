@@ -169,7 +169,7 @@ a pending checkout, `points.account.expiringSoonLot` is the holder's
 earliest-expiring usable lot. Terminal PaymentIntents return `points.account`
 as null but retain durable authorization history. After token settlement,
 `confirmedPayments[].fromAddress` identifies verified sender B and `reward`
-identifies B when a pending Order reward exists. Neither display projection is
+identifies B when an Order reward exists. Neither display projection is
 a ledger identifier or executable payment amount.
 
 Serialize typed response data when you need to cache, log, debug, or pass data across app layers:
