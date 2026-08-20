@@ -13,12 +13,22 @@ class PointAuthorizationService {
     required PaymentIntent intent,
     required String pointAmount,
   }) {
+    final pointsAuthorization = intent.points?.authorization;
     final payer = intent.payer;
-    final payerAddress = payer?.address;
-    if (payerAddress == null) {
+    final payerAddress = pointsAuthorization?.holderAddress ?? payer?.address;
+    final currentAmount =
+        pointsAuthorization?.amount ?? payer?.point.authorization.amount;
+    final maximumAmount = pointsAuthorization?.maximumAmount ??
+        payer?.point.authorization.maxAmount;
+    final currentRevision =
+        pointsAuthorization?.revision ?? payer?.point.authorization.revision;
+    if (payerAddress == null ||
+        currentAmount == null ||
+        maximumAmount == null ||
+        currentRevision == null) {
       throw MisePayException(
         'PAYER_REQUIRED',
-        'Payer context is required to build point authorization.',
+        'Point authorization context is required to build point authorization.',
       );
     }
 
@@ -27,11 +37,11 @@ class PointAuthorizationService {
       'INVALID_POINT_AMOUNT',
     );
     final currentPointAmount = parseNonNegativeIntegerString(
-      payer!.point.authorization.amount,
+      currentAmount,
       'INVALID_CURRENT_POINT_AMOUNT',
     );
     final maxPointAmount = parseNonNegativeIntegerString(
-      payer.point.authorization.maxAmount,
+      maximumAmount,
       'INVALID_POINT_LIMIT',
     );
 
@@ -48,7 +58,6 @@ class PointAuthorizationService {
       );
     }
 
-    final currentRevision = payer.point.authorization.revision;
     if (currentRevision < 0) {
       throw MisePayException(
         'INVALID_AUTHORIZATION_REVISION',
