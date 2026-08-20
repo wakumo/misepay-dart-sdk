@@ -188,6 +188,32 @@ void main() {
 
   group('PaymentIntentsClient.authorizePoints', () {
     test(
+        'builds the first point authorization from canonical points without legacy payer',
+        () {
+      final client = MisePayClient();
+      final json = _paymentIntentJson(points: _initialPointsJson())
+        ..remove('payer');
+      final intent = PaymentIntent.fromJson(json);
+
+      final authorization = client.paymentIntents.authorizePoints(
+        paymentIntent: intent,
+        pointAmount: '2',
+      );
+
+      expect(intent.payer, isNull);
+      expect(intent.points?.authorization?.status, isNull);
+      expect(authorization.payerAddress, '0xHolderA');
+      expect(authorization.authorizationRevision, 1);
+      expect(authorization.message, {
+        'intentId': 'pi_123',
+        'payer': '0xHolderA',
+        'pointAmount': '2',
+        'authorizationRevision': '1',
+        'expiresAt': 1783339500,
+      });
+    });
+
+    test(
         'builds point authorization from canonical points without legacy payer',
         () {
       final client = MisePayClient();
@@ -1339,5 +1365,21 @@ Map<String, dynamic> _pointsJson() => {
         'maximum_amount': '5',
         'revision': 1,
         'status': 'reserved',
+      },
+    };
+
+Map<String, dynamic> _initialPointsJson() => {
+      'account': {
+        'holder_address': '0xHolderA',
+        'label': 'MisePay Points',
+        'available_balance': '5',
+        'expiring_soon_lot': null,
+      },
+      'authorization': {
+        'holder_address': '0xHolderA',
+        'amount': '0',
+        'maximum_amount': '5',
+        'revision': 0,
+        'status': null,
       },
     };

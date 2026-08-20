@@ -147,10 +147,11 @@ nullable projection of the prior shape:
 }
 ```
 
-`points.authorization.amount` is the persisted point target and remains
-available after release. `maximum_amount` is the total currently selectable
-target, not an additional amount; it is null on terminal PaymentIntents.
-`points.authorization.status` is `reserved`, `consumed`, or `released`.
+`points.authorization.amount` is `"0"` before first submission and is the
+persisted point target afterward, including after release. `maximum_amount` is
+the total currently selectable target, not an additional amount; it is null on
+terminal PaymentIntents. `points.authorization.status` is null before first
+submission, then `reserved`, `consumed`, or `released`.
 `paymentIntent.payer` is not connected-wallet state and must not be overwritten
 when the wallet provider switches accounts.
 

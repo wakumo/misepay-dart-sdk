@@ -104,9 +104,9 @@ class PaymentIntentPointAccount {
       };
 }
 
-/// Durable point-authorization history for a PaymentIntent.
+/// Current point-authorization state for a PaymentIntent.
 class PaymentIntentPointAuthorization {
-  /// Creates immutable point-authorization context.
+  /// Creates immutable point-authorization state.
   const PaymentIntentPointAuthorization({
     required this.holderAddress,
     required this.amount,
@@ -122,23 +122,25 @@ class PaymentIntentPointAuthorization {
         amount: json['amount'] as String,
         maximumAmount: json['maximum_amount'] as String?,
         revision: json['revision'] as int,
-        status: PointAuthorizationStatus.fromJson(json['status'] as String),
+        status: json['status'] == null
+            ? null
+            : PointAuthorizationStatus.fromJson(json['status'] as String),
       );
 
   /// Address that authorized this point target.
   final String holderAddress;
 
-  /// Persisted selected amount, retained even if the authorization is released.
+  /// Current selected amount, retained after a persisted authorization releases.
   final String amount;
 
   /// Current maximum selectable amount while the PaymentIntent is actionable.
   final String? maximumAmount;
 
-  /// Persisted authorization revision.
+  /// Current authorization revision.
   final int revision;
 
-  /// Persisted authorization lifecycle status.
-  final PointAuthorizationStatus status;
+  /// Persisted authorization lifecycle status, or null before first submission.
+  final PointAuthorizationStatus? status;
 
   /// Serializes this value back to API-shaped JSON.
   Map<String, dynamic> toJson() => {
@@ -146,6 +148,6 @@ class PaymentIntentPointAuthorization {
         'amount': amount,
         'maximum_amount': maximumAmount,
         'revision': revision,
-        'status': status.toJson(),
+        'status': status?.toJson(),
       };
 }
