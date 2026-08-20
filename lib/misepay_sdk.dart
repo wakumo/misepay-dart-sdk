@@ -7,6 +7,7 @@ export 'src/payment_intents/domain/confirmed_payment.dart';
 export 'src/payment_intents/domain/reward.dart';
 export 'src/payment_intents/domain/merchant.dart';
 export 'src/payment_intents/domain/payer.dart';
+export 'src/payment_intents/domain/payment_intent_points.dart';
 export 'src/payment_intents/domain/payment_intent.dart';
 export 'src/payment_intents/domain/payment_intent_actions.dart';
 export 'src/payment_intents/domain/payment_intent_status.dart';
