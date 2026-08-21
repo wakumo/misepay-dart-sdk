@@ -72,6 +72,7 @@ paymentIntent.merchant.name;
 paymentIntent.merchant.imageUrl;
 paymentIntent.store.name;
 paymentIntent.store.imageUrl;
+paymentIntent.payerAddress;
 paymentIntent.amount.gross;
 paymentIntent.amount.net;
 paymentIntent.amount.pointDiscount;
@@ -257,9 +258,10 @@ replacement or cancellation authority. Staff provides a distinct new QR and
 ## Point Authorization
 
 When the payer wants to apply points, build EIP-712 typed data from the full
-`PaymentIntent`. The SDK prefers `points.authorization` and falls back to the
-legacy nullable `payer` projection for compatibility. Point authorization is
-independent of the selected chain or payment option.
+`PaymentIntent`. The SDK resolves authorization identity from
+`points.authorization.holderAddress ?? payerAddress`. Legacy `payer.address`
+is display-only and is not a signing or validation fallback. Point
+authorization is independent of the selected chain or payment option.
 
 ```dart
 final authorization = client.paymentIntents.authorizePoints(

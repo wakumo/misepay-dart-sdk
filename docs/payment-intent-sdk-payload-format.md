@@ -46,8 +46,9 @@ await misepayClient.paymentIntents.provePayment(
 - The SDK validates the `requestUri` origin against built-in production settings unless trusted override settings or permissive origin mode are provided.
 - The SDK validates origin only, not path. The backend route remains opaque to the SDK.
 - If `payerAddress` is provided, the SDK appends `payer_address` to the initial GET URL.
+- API response `payer_address` maps to nullable `PaymentIntent.payerAddress` and identifies the canonical bound authorization holder, never the viewing wallet or verified token sender.
 - `PaymentIntent.points.account` is live viewer context selected by `payerAddress`. `PaymentIntent.points.authorization` is canonical persisted authorization context. Legacy `PaymentIntent.payer` remains a nullable projection of the authorization holder during the compatibility window.
-- `authorizePoints` derives the EIP-712 `payer` from canonical `points.authorization.holder_address`, with legacy `payer.address` as a compatibility fallback. `applyPoints` rejects an authorization whose signed payer differs from that holder before HTTP. The SDK does not require separate connected-wallet runtime state.
+- `authorizePoints` derives the EIP-712 `payer` from `points.authorization.holder_address ?? payer_address`. Legacy `payer.address` is not an identity fallback. `applyPoints` rejects an authorization whose signed payer differs from the same canonical holder before HTTP.
 - The public SDK cannot cancel or replace a PaymentIntent. A customer must ask authenticated merchant staff to cancel the old attempt and issue a new QR/request URI; Wallet B may act only after fetching that distinct new resource.
 - Follow-up API calls MUST use response `actions` URLs.
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.
@@ -89,6 +90,7 @@ When no point holder is bound, omitting `payerAddress` produces explicit
   "order_id": "order_123",
   "request_uri": "https://api.misepay.app/v1/payment-intents/pi_123",
   "status": "pending",
+  "payer_address": null,
   "merchant": {
     "name": "Cafe ABC",
     "image_url": "https://cdn.example.com/merchants/cafe-abc.jpg"
@@ -143,6 +145,7 @@ returns B under `points.account` while authorization and legacy `payer` remain A
     "image_url": "https://cdn.example.com/merchants/cafe-abc.jpg"
   },
   "store": { "name": "Shibuya Store", "image_url": null },
+  "payer_address": "0xHolderA...",
   "payer": {
     "address": "0xHolderA...",
     "point": {

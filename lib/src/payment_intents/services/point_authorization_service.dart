@@ -15,7 +15,8 @@ class PointAuthorizationService {
   }) {
     final pointsAuthorization = intent.points?.authorization;
     final payer = intent.payer;
-    final payerAddress = pointsAuthorization?.holderAddress ?? payer?.address;
+    final payerAddress =
+        pointsAuthorization?.holderAddress ?? intent.payerAddress;
     final currentAmount =
         pointsAuthorization?.amount ?? payer?.point.authorization.amount;
     final maximumAmount = pointsAuthorization?.maximumAmount ??

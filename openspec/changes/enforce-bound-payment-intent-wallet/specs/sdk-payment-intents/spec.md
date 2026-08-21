@@ -3,6 +3,8 @@
 
 The SDK SHALL derive point authorization identity from the PaymentIntent's canonical point holder context and SHALL reject submission of an authorization signed for a different payer before making an HTTP request.
 
+Canonical holder resolution SHALL be `points.authorization.holder_address ?? payer_address`. The SDK SHALL NOT use legacy `payer.address` as authorization identity.
+
 #### Scenario: Authorization payer matches canonical holder
 
 - **GIVEN** a PaymentIntent whose canonical point authorization holder is Wallet A
@@ -40,3 +42,17 @@ The SDK SHALL preserve `points.account` as viewer context and `points.authorizat
 - **THEN** the SDK SHALL expose Wallet B under `points.account`
 - **AND** SHALL retain Wallet A under `points.authorization` and legacy `payer`
 - **AND** SHALL continue deriving point authorization identity from Wallet A
+
+#### Scenario: Canonical top-level payer without points authorization
+
+- **GIVEN** canonical `points.authorization` is absent
+- **AND** top-level `payer_address` identifies Wallet A
+- **WHEN** the SDK builds point authorization using the legacy point amount projection
+- **THEN** the EIP-712 payer SHALL be Wallet A
+
+#### Scenario: Legacy payer is not identity fallback
+
+- **GIVEN** canonical `points.authorization` and top-level `payer_address` are absent
+- **AND** legacy `payer.address` identifies Wallet A
+- **WHEN** the SDK attempts to build point authorization
+- **THEN** it SHALL fail locally with `PAYER_REQUIRED`

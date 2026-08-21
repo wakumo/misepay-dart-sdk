@@ -5,7 +5,7 @@ The SDK is used by the Avacus customer wallet. `points.authorization.holder_addr
 
 ### Use signed authorization identity
 
-`authorizePoints` delegates to `PointAuthorizationService`, which derives the EIP-712 payer from canonical point authorization context before the legacy payer fallback. `applyPoints` compares the resulting authorization payer to the same holder context before sending HTTP and returns `POINT_AUTHORIZATION_HOLDER_MISMATCH` on inconsistency.
+`authorizePoints` delegates to `PointAuthorizationService`, which derives the EIP-712 payer from `points.authorization.holder_address ?? payer_address`. `applyPoints` compares the resulting authorization payer to the same holder context before sending HTTP and returns `POINT_AUTHORIZATION_HOLDER_MISMATCH` on inconsistency. Legacy `payer.address` is display-only and is not an identity fallback.
 
 No `connectedWalletAddress` parameter is needed. It would be duplicated app runtime state rather than an independent security boundary.
 
@@ -24,4 +24,4 @@ The SDK uses backend-provided nullable action URLs. A terminal or otherwise unav
 ## Risks / Trade-offs
 
 - A caller can manually construct inconsistent authorization data, so `applyPoints` checks holder consistency before HTTP; the backend still performs authoritative signature and state validation.
-- Legacy payloads without canonical points continue to use `payer.address` until compatibility support is removed separately.
+- Older payloads missing both canonical authorization and top-level `payer_address` cannot build or submit point authorization, even if legacy `payer.address` is present.

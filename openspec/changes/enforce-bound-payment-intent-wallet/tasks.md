@@ -3,7 +3,7 @@
 
 - [x] 2. Remove `connectedWalletAddress` from `authorizePoints`, `applyPoints`, and `provePayment` and update all SDK call sites and examples.
 
-- [x] 3. Validate `applyPoints` authorization payer against canonical `points.authorization.holder_address`, with legacy `payer.address` fallback.
+- [x] 3. Validate `applyPoints` authorization payer against canonical `points.authorization.holder_address`, with legacy `payer.address` fallback. Superseded by task 8.
 
 - [x] 4. Remove connected-wallet and duplicate terminal-status guards; retain backend action URLs and verified chain sender as authoritative boundaries.
 
@@ -12,3 +12,5 @@
 - [x] 6. Run focused/full Dart tests, analysis, scoped format checks, `git diff --check`, and strict OpenSpec validation; record exact results. (verification: 55 tests passed; `dart analyze`, scoped `dart format --output=none --set-exit-if-changed`, strict OpenSpec validation, and diff check passed outside the sandbox.)
 
 - [x] 7. Align README, payload documentation, and OpenSpec with viewer-specific `points.account` while preserving the bound `points.authorization` and legacy `payer`; no SDK production contract change. (verification: 55 tests passed; `dart analyze`, strict OpenSpec validation, and `git diff --check` passed.)
+
+- [x] 8. Parse nullable top-level `payer_address` as `PaymentIntent.payerAddress`, use `points.authorization.holder_address ?? payer_address` for authorization identity, and remove the legacy `payer.address` fallback. (verification: RED failed because `PaymentIntent.payerAddress` was absent; GREEN 57 tests passed with analyze and scoped format checks.)
