@@ -248,9 +248,10 @@ with `cancelled`. Either value can be null for historical data or during a
 staggered backend rollout; do not substitute `createdAt` or `expiresAt` as an
 invented terminal time.
 
-When a merchant creates a replacement PaymentIntent after expiry, the backend
-returns a new id, expiry, and `requestUri`. Generate the replacement QR from
-that new URI; never reuse the expired intent URI or rebuild one from the id.
+When a customer asks to switch wallets, only an authenticated MisePay staff
+member can cancel and replace the payment attempt. The wallet SDK has no
+replacement or cancellation authority. Staff provides a distinct new QR and
+`requestUri`; discard the cancelled resource and never reuse its actions.
 
 ## Point Authorization
 
@@ -292,7 +293,9 @@ Keep these unit domains separate:
 The backend locks current PaymentIntent state and recomputes remaining value, balance, benefit, net amount, and settlement base units when the signed authorization is submitted. Do not convert any of these string values to floating point.
 
 While the PaymentIntent remains pending, the same holder may increase, decrease, clear, or reapply points within the returned `authorization.maxAmount`. An unchanged selection is a local `POINT_AMOUNT_UNCHANGED` no-op. The holder remains bound after clearing to zero.
-Another connected wallet cannot edit that holder's target; it must create or use a replacement PaymentIntent before authorizing its own points.
+Another connected wallet cannot edit that holder's target. It must ask staff to
+replace the attempt, then fetch the staff-issued replacement URI before it can
+authorize its own points.
 
 ## Payment Proof
 
@@ -304,7 +307,7 @@ final paidIntent = await client.paymentIntents.provePayment(
   chainId: 137,
   tokenAddress: '0xJPYCPolygon',
   txHash: '0xtx',
-  payerAddress: connectedWalletAddress,
+  payerAddress: payerAddress,
 );
 ```
 
@@ -320,12 +323,14 @@ validate it against the point holder or treat it as verified sender evidence.
 Only `confirmedPayments[].fromAddress`, populated after worker/scanner chain
 verification, identifies the token sender.
 
-An exact discounted transfer consumes A's reserved points. A transfer that
-alone covers or exceeds gross completes the PaymentIntent as token-only,
-releases A's reservation, and records any surplus without rewarding above
-gross. A proof transport/queue error means acceleration failed, not that the
-broadcast failed: retry the same proof or continue polling, and never resend
-JPYC because of a proof error.
+An exact discounted transfer from the bound wallet consumes that wallet's
+reserved points. A full or surplus gross transfer from the same bound wallet
+releases its reservation and completes the PaymentIntent. A transfer from any
+other wallet is retained by the backend as unmatched recovery evidence: it does
+not settle, review, release, consume, or otherwise change the bound attempt.
+A proof transport/queue error means acceleration failed, not that the broadcast
+failed: retry the same proof or continue polling, and never resend JPYC because
+of a proof error.
 
 ## Errors
 

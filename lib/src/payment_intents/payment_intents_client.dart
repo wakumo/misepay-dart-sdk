@@ -1,6 +1,7 @@
 import 'domain/payment_intent.dart';
 import 'domain/payment_intent_repository.dart';
 import 'domain/point_authorization.dart';
+import '../core/misepay_exception.dart';
 import 'services/point_authorization_service.dart';
 
 /// Resource client for PaymentIntent checkout operations.
@@ -33,8 +34,8 @@ class PaymentIntentsClient {
   /// Builds EIP-712 point authorization typed data for [paymentIntent].
   ///
   /// [pointAmount] must be a non-negative integer string. The full
-  /// [paymentIntent] is required because validation uses payer, point limits,
-  /// current point selection, and expiry data.
+  /// [paymentIntent] is required because validation uses canonical point-holder
+  /// context, point limits, current point selection, and expiry data.
   PointAuthorization authorizePoints({
     required PaymentIntent paymentIntent,
     required String pointAmount,
@@ -51,6 +52,7 @@ class PaymentIntentsClient {
     required PointAuthorization authorization,
     required String signature,
   }) {
+    _assertAuthorizationHolderMatches(paymentIntent, authorization);
     return _repository.submitPointAuthorization(
       intent: paymentIntent,
       authorization: authorization,
@@ -76,5 +78,21 @@ class PaymentIntentsClient {
       txHash: txHash,
       payerAddress: payerAddress,
     );
+  }
+
+  void _assertAuthorizationHolderMatches(
+    PaymentIntent paymentIntent,
+    PointAuthorization authorization,
+  ) {
+    final holderAddress = paymentIntent.points?.authorization?.holderAddress ??
+        paymentIntent.payer?.address;
+    if (holderAddress != null &&
+        holderAddress.toLowerCase() !=
+            authorization.payerAddress.toLowerCase()) {
+      throw MisePayException(
+        'POINT_AUTHORIZATION_HOLDER_MISMATCH',
+        'Point authorization payer does not match the PaymentIntent point holder.',
+      );
+    }
   }
 }

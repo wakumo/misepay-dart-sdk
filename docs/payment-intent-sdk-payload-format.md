@@ -34,7 +34,7 @@ await misepayClient.paymentIntents.provePayment(
   chainId: selectedOption.chainId,
   tokenAddress: selectedOption.tokenAddress,
   txHash: txHash,
-  payerAddress: connectedWalletAddress,
+  payerAddress: payerAddress,
 );
 ```
 
@@ -47,6 +47,8 @@ await misepayClient.paymentIntents.provePayment(
 - The SDK validates origin only, not path. The backend route remains opaque to the SDK.
 - If `payerAddress` is provided, the SDK appends `payer_address` to the initial GET URL.
 - `PaymentIntent.points` is canonical point context. `PaymentIntent.payer` is a nullable legacy projection during the compatibility window; neither is connected-wallet state. Once A is bound, switching the app wallet to B does not replace A.
+- `authorizePoints` derives the EIP-712 `payer` from canonical `points.authorization.holder_address`, with legacy `payer.address` as a compatibility fallback. `applyPoints` rejects an authorization whose signed payer differs from that holder before HTTP. The SDK does not require separate connected-wallet runtime state.
+- The public SDK cannot cancel or replace a PaymentIntent. A customer must ask authenticated merchant staff to cancel the old attempt and issue a new QR/request URI; Wallet B may act only after fetching that distinct new resource.
 - Follow-up API calls MUST use response `actions` URLs.
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.
 - The SDK accepts PaymentIntent payload version `1` and rejects any other version with `UNSUPPORTED_PAYMENT_INTENT_VERSION` before using payment instructions or actions.
@@ -249,10 +251,11 @@ canonical Transaction:
 }
 ```
 
-This separation is intentional: A owns point consent and B funded the verified
-token transfer. Full or surplus token coverage releases A's active reservation
-and completes the PaymentIntent; it does not cancel the paid intent. Accepted
-and reward value remain capped at gross, while the backend records surplus.
+For a point-backed attempt, the verified token sender must be the bound holder.
+Full or surplus token coverage from that same wallet releases its active
+reservation and completes the PaymentIntent. A transfer from another wallet is
+recorded as unmatched recovery evidence and does not change the attempt,
+Order, points, reward, or notification state.
 
 ## EIP-712 Typed Data
 
@@ -319,7 +322,7 @@ it as sender evidence. Omitting it does not change verification or settlement.
 
 ## Actions
 
-Action keys are stable, but values may be null when an action is unavailable for the current PaymentIntent state. SDK methods fail locally with `ACTION_UNAVAILABLE` when called for a null action.
+Action keys are stable, but values may be null when an action is unavailable for the current PaymentIntent state. SDK methods fail locally with `ACTION_UNAVAILABLE` when the requested action URL is null. The backend response and action URLs remain authoritative for terminal-state eligibility.
 
 ## SDK Environment And Origin Settings
 

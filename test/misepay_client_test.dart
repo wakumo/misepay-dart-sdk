@@ -886,6 +886,94 @@ void main() {
   });
 
   group('PaymentIntent action submissions', () {
+    test(
+        'rejects point authorization signed for a different holder before HTTP',
+        () async {
+      final requests = <http.Request>[];
+      final client = MisePayClient(
+        allowedOrigins: {'https://api-dev.misepay.app'},
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          return _jsonResponse(_paymentIntentJson());
+        }),
+      );
+      final json = _paymentIntentJson(points: _pointsJson())..remove('payer');
+      final intent = PaymentIntent.fromJson(json);
+      const authorization = PointAuthorization(
+        payerAddress: '0xWalletB',
+        pointAmount: '2',
+        authorizationRevision: 1,
+        typedData: {},
+      );
+
+      expect(
+        () => client.paymentIntents.applyPoints(
+          paymentIntent: intent,
+          authorization: authorization,
+          signature: '0xsig',
+        ),
+        throwsA(isA<MisePayException>().having(
+          (error) => error.code,
+          'code',
+          'POINT_AUTHORIZATION_HOLDER_MISMATCH',
+        )),
+      );
+      expect(requests, isEmpty);
+    });
+
+    test('allows Wallet B to act only on a fresh unbound replacement request',
+        () async {
+      final requests = <http.Request>[];
+      final client = MisePayClient(
+        allowedOrigins: {'https://api-dev.misepay.app'},
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          if (request.method == 'GET') {
+            return _jsonResponse({
+              ..._paymentIntentJson(payer: _payerJson(address: '0xWalletB')),
+              'id': 'pi_replacement',
+              'request_uri':
+                  'https://api-dev.misepay.app/v1/payment-intents/pi_replacement',
+            });
+          }
+          return _jsonResponse({
+            ..._paymentIntentJson(
+                payer: _payerJson(address: '0xWalletB', intentAmount: '2')),
+            'id': 'pi_replacement',
+            'request_uri':
+                'https://api-dev.misepay.app/v1/payment-intents/pi_replacement',
+          });
+        }),
+      );
+      final cancelledIntent = PaymentIntent.fromJson(
+        _paymentIntentJson(
+          payer: _payerJson(address: '0xHolderA'),
+          status: PaymentIntentStatus.cancelled.value,
+        ),
+      );
+
+      final replacement = await client.paymentIntents.get(
+        requestUri:
+            'https://api-dev.misepay.app/v1/payment-intents/pi_replacement',
+        payerAddress: '0xWalletB',
+      );
+      final authorization = client.paymentIntents.authorizePoints(
+        paymentIntent: replacement,
+        pointAmount: '2',
+      );
+      final updated = await client.paymentIntents.applyPoints(
+        paymentIntent: replacement,
+        authorization: authorization,
+        signature: '0xsig',
+      );
+
+      expect(cancelledIntent.status, PaymentIntentStatus.cancelled);
+      expect(replacement.id, 'pi_replacement');
+      expect(replacement.requestUri, isNot(cancelledIntent.requestUri));
+      expect(updated.payer?.address, '0xWalletB');
+      expect(requests.map((request) => request.method), ['GET', 'POST']);
+    });
+
     test('submits point authorization to action URL', () async {
       final requests = <http.Request>[];
       final client = MisePayClient(
