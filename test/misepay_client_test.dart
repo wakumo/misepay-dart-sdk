@@ -187,6 +187,44 @@ void main() {
   });
 
   group('PaymentIntentsClient.authorizePoints', () {
+    test('uses canonical payer_address without legacy payer identity fallback',
+        () {
+      final client = MisePayClient();
+      final json = _paymentIntentJson(
+        payer: _payerJson(address: '0xLegacyB'),
+      )..['payer_address'] = '0xHolderA';
+      final intent = PaymentIntent.fromJson(json);
+
+      final authorization = client.paymentIntents.authorizePoints(
+        paymentIntent: intent,
+        pointAmount: '2',
+      );
+
+      expect(intent.payerAddress, '0xHolderA');
+      expect(authorization.payerAddress, '0xHolderA');
+      expect(intent.toJson()['payer_address'], '0xHolderA');
+    });
+
+    test('does not use legacy payer address as authorization identity', () {
+      final client = MisePayClient();
+      final json = _paymentIntentJson(
+        payer: _payerJson(address: '0xLegacyA'),
+      )..remove('payer_address');
+      final intent = PaymentIntent.fromJson(json);
+
+      expect(
+        () => client.paymentIntents.authorizePoints(
+          paymentIntent: intent,
+          pointAmount: '2',
+        ),
+        throwsA(isA<MisePayException>().having(
+          (error) => error.code,
+          'code',
+          'PAYER_REQUIRED',
+        )),
+      );
+    });
+
     test(
         'builds the first point authorization from canonical points without legacy payer',
         () {
@@ -1376,6 +1414,7 @@ Map<String, dynamic> _paymentIntentJson({
     'status': status,
     'merchant': {'name': 'Cafe ABC', 'image_url': merchantImageUrl},
     'store': {'name': 'Shibuya Store', 'image_url': storeImageUrl},
+    'payer_address': payer?['address'] as String?,
     'payer': payer,
     if (points != null) 'points': points,
     'amount': {

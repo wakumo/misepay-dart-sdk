@@ -85,7 +85,7 @@ class PaymentIntentsClient {
     PointAuthorization authorization,
   ) {
     final holderAddress = paymentIntent.points?.authorization?.holderAddress ??
-        paymentIntent.payer?.address;
+        paymentIntent.payerAddress;
     if (holderAddress != null &&
         holderAddress.toLowerCase() !=
             authorization.payerAddress.toLowerCase()) {

@@ -19,7 +19,8 @@ The Avacus wallet SDK already builds EIP-712 point authorization with a payer ad
 ## What Changes
 
 - Do not require `connectedWalletAddress` in `authorizePoints`, `applyPoints`, or `provePayment`.
-- Derive the EIP-712 payer from canonical `points.authorization.holder_address`, with legacy `payer.address` only as a compatibility fallback.
+- Expose nullable API `payer_address` as `PaymentIntent.payerAddress`.
+- Derive EIP-712 and submission holder identity from `points.authorization.holder_address ?? payer_address`; do not fall back to legacy `payer.address`.
 - Before HTTP submission, reject a point authorization whose payer differs from the PaymentIntent holder.
 - Leave proof sender verification to the API's verified ERC-20 `Transfer.from` processing.
 - Document that `payerAddress` selects `points.account` viewer context without replacing the persisted authorization holder.
@@ -28,6 +29,7 @@ The Avacus wallet SDK already builds EIP-712 point authorization with a payer ad
 ## Acceptance Criteria
 
 - Point authorization construction uses the PaymentIntent's canonical holder context without separate wallet state.
+- Payloads without canonical points use `PaymentIntent.payerAddress`, not legacy `payer.address`, as authorization identity.
 - `applyPoints` fails locally with `POINT_AUTHORIZATION_HOLDER_MISMATCH` when the authorization payer differs from the canonical holder and makes no HTTP request.
 - `provePayment` submits only the transaction hash and optional rendering context; it does not claim to validate the sender locally.
 - Apps can render Wallet B's account while retaining Wallet A's authorization and legacy payer context.

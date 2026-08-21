@@ -30,6 +30,7 @@ class PaymentIntent {
     this.createdAt,
     this.completedAt,
     this.cancelledAt,
+    this.payerAddress,
     this.payer,
     this.points,
     this.reward,
@@ -53,6 +54,7 @@ class PaymentIntent {
       status: PaymentIntentStatus.fromJson(json['status'] as String),
       merchant: Merchant.fromJson(json['merchant'] as Map<String, dynamic>),
       store: Store.fromJson(json['store'] as Map<String, dynamic>),
+      payerAddress: json['payer_address'] as String?,
       payer: json['payer'] == null
           ? null
           : Payer.fromJson(json['payer'] as Map<String, dynamic>),
@@ -109,6 +111,9 @@ class PaymentIntent {
   /// Store summary displayed to the payer.
   final Store store;
 
+  /// Canonical wallet bound to this PaymentIntent's point authorization.
+  final String? payerAddress;
+
   /// Payer-specific point context, present only when fetched with payer data.
   final Payer? payer;
 
@@ -152,6 +157,7 @@ class PaymentIntent {
       'status': status.toJson(),
       'merchant': merchant.toJson(),
       'store': store.toJson(),
+      'payer_address': payerAddress,
       'amount': amount.toJson(),
       'payment_options':
           paymentOptions.map((option) => option.toJson()).toList(),
