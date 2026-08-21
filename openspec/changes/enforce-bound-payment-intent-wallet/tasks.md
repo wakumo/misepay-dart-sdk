@@ -10,3 +10,5 @@
 - [x] 5. Update README, payload-format documentation, and OpenSpec to describe signed holder consistency and backend sender verification.
 
 - [x] 6. Run focused/full Dart tests, analysis, scoped format checks, `git diff --check`, and strict OpenSpec validation; record exact results. (verification: 55 tests passed; `dart analyze`, scoped `dart format --output=none --set-exit-if-changed`, strict OpenSpec validation, and diff check passed outside the sandbox.)
+
+- [x] 7. Align README, payload documentation, and OpenSpec with viewer-specific `points.account` while preserving the bound `points.authorization` and legacy `payer`; no SDK production contract change. (verification: 55 tests passed; `dart analyze`, strict OpenSpec validation, and `git diff --check` passed.)

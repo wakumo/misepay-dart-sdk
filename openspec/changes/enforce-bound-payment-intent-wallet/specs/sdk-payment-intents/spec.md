@@ -28,3 +28,15 @@ The SDK SHALL NOT treat app runtime wallet state or proof payer context as verif
 - **WHEN** it calls `provePayment`
 - **THEN** the SDK SHALL submit the hash through the backend-provided action URL
 - **AND** the backend SHALL remain responsible for verifying ERC-20 `Transfer.from` before settlement
+
+### Requirement: Viewer Account Is Not Authorization Identity
+
+The SDK SHALL preserve `points.account` as viewer context and `points.authorization` as persisted authorization context without deriving one from the other.
+
+#### Scenario: Wallet B views Wallet A's bound intent
+
+- **GIVEN** Wallet A is the persisted point authorization holder
+- **WHEN** the app fetches the PaymentIntent with `payerAddress` equal to Wallet B
+- **THEN** the SDK SHALL expose Wallet B under `points.account`
+- **AND** SHALL retain Wallet A under `points.authorization` and legacy `payer`
+- **AND** SHALL continue deriving point authorization identity from Wallet A

@@ -46,7 +46,7 @@ await misepayClient.paymentIntents.provePayment(
 - The SDK validates the `requestUri` origin against built-in production settings unless trusted override settings or permissive origin mode are provided.
 - The SDK validates origin only, not path. The backend route remains opaque to the SDK.
 - If `payerAddress` is provided, the SDK appends `payer_address` to the initial GET URL.
-- `PaymentIntent.points` is canonical point context. `PaymentIntent.payer` is a nullable legacy projection during the compatibility window; neither is connected-wallet state. Once A is bound, switching the app wallet to B does not replace A.
+- `PaymentIntent.points.account` is live viewer context selected by `payerAddress`. `PaymentIntent.points.authorization` is canonical persisted authorization context. Legacy `PaymentIntent.payer` remains a nullable projection of the authorization holder during the compatibility window.
 - `authorizePoints` derives the EIP-712 `payer` from canonical `points.authorization.holder_address`, with legacy `payer.address` as a compatibility fallback. `applyPoints` rejects an authorization whose signed payer differs from that holder before HTTP. The SDK does not require separate connected-wallet runtime state.
 - The public SDK cannot cancel or replace a PaymentIntent. A customer must ask authenticated merchant staff to cancel the old attempt and issue a new QR/request URI; Wallet B may act only after fetching that distinct new resource.
 - Follow-up API calls MUST use response `actions` URLs.
@@ -60,7 +60,7 @@ await misepayClient.paymentIntents.provePayment(
 - Point identity is backend-owned as `merchant_id + point_type + holder_address`. For the POC, `point_type` has a single backend default value. The SDK/app sends only `payerAddress`; it does not send or choose `point_type`.
 - Payment chain is not part of point identity.
 - `PaymentIntent.points` is nullable for staggered rollout. `points.account` is a pending-only live snapshot with `holder_address`, `available_balance`, and nullable `expiring_soon_lot`; `points.authorization` always carries a pending holder's amount, nullable `maximum_amount`, and revision. Before first submission it has amount `"0"`, revision `0`, and null status; afterward status is `reserved`, `consumed`, or `released`.
-- Top-level `reward` is nullable and maps to `PaymentIntent.reward`. After completed token settlement creates a reward lot, it contains the persisted reward recipient, integer-string amount, persisted grant status (`pending`, `available`, or `voided`), and availability time. A remains `points.authorization.holderAddress` while verified token payer B is `confirmedPayments[].fromAddress` and, when present, `reward.recipientAddress`.
+- Top-level `reward` is nullable and maps to `PaymentIntent.reward`. After completed token settlement creates a reward lot, it contains the persisted reward recipient, integer-string amount, persisted grant status (`pending`, `available`, or `voided`), and availability time. For an A-bound point attempt, another wallet's transfer remains unmatched and cannot become that attempt's confirmed payment or reward recipient.
 - EIP-712 domain salt labels are derived from the SDK environment, not from app input, the link, or the API response. The configured labels are `misepay:prod` for production and `misepay:dev` for development. Before signing, `typedData.domain.salt` is set to `keccak256(UTF-8(label))` as a lowercase, `0x`-prefixed bytes32.
 - `pointAmount` is a non-negative integer point string where `1 point = 1 JPY`; it is never scaled using token decimals.
 - `amount.gross`, `amount.benefit`, `amount.net`, `amount.pointDiscount`, and `amount.tokenDue` are backend-derived display/accounting values and are not part of point consent. `pointDiscount == benefit` and `tokenDue == net`.
@@ -128,8 +128,8 @@ When no point holder is bound, omitting `payerAddress` produces explicit
 ```
 
 When no holder is bound, supplying `payerAddress` requests preview balance and
-authorization values. Once A authorizes points, the same shape remains bound to
-A even when connected wallet B supplies later query or proof context:
+authorization values. Once A authorizes points, fetching with `payerAddress=B`
+returns B under `points.account` while authorization and legacy `payer` remain A:
 
 ```json
 {
@@ -144,14 +144,14 @@ A even when connected wallet B supplies later query or proof context:
   },
   "store": { "name": "Shibuya Store", "image_url": null },
   "payer": {
-    "address": "0xabc...",
+    "address": "0xHolderA...",
     "point": {
       "label": "MisePay Points",
       "balance": { "available": "5000" },
       "authorization": {
-        "amount": "0",
+        "amount": "1200",
         "max_amount": "3000",
-        "revision": 0
+        "revision": 1
       },
       "expiring_soon_lot": {
         "amount": "21000",
@@ -159,12 +159,30 @@ A even when connected wallet B supplies later query or proof context:
       }
     }
   },
+  "points": {
+    "account": {
+      "holder_address": "0xViewerB...",
+      "label": "MisePay Points",
+      "available_balance": "9000",
+      "expiring_soon_lot": {
+        "amount": "9000",
+        "expires_at": "2026-10-15T00:00:00Z"
+      }
+    },
+    "authorization": {
+      "holder_address": "0xHolderA...",
+      "amount": "1200",
+      "maximum_amount": "3000",
+      "revision": 1,
+      "status": "reserved"
+    }
+  },
   "reward": null,
   "amount": {
     "currency": "JPY",
     "gross": "3000",
-    "benefit": "0",
-    "net": "3000"
+    "benefit": "1200",
+    "net": "1800"
   },
   "payment_options": [
     {
@@ -189,7 +207,10 @@ A even when connected wallet B supplies later query or proof context:
 }
 ```
 
-This response represents a partial-payment state: `1200000000000000000000` token base units have already been verified on-chain, so the current expected payment in `payment_options[0].amount_base_units` is `1800000000000000000000` even though the full gross order amount remains `3000`.
+This response represents A's 1200-point authorization and B's account preview.
+The current token instruction remains derived from A's authorization, so
+`payment_options[0].amount_base_units` is `1800000000000000000000`; B's 9000-point
+balance does not change the amount due.
 
 The SDK exposes `authorization.amount` as a string and `authorization.max_amount`
 as `authorization.maxAmount`. Both fields are required whenever `payer` is not
@@ -315,10 +336,11 @@ The payer selects a total target of `1200` point units at revision `1` for `pi_1
 }
 ```
 
-`payer_address` is optional and exists only so the `202 Accepted` response can
-render useful wallet context when no holder is bound. At request time the API
-does not fetch the transaction receipt, validate this address against A, or use
-it as sender evidence. Omitting it does not change verification or settlement.
+`payer_address` is optional viewer context for the returned `points.account`,
+including when another holder is already bound. It does not replace
+`points.authorization` or legacy `payer`. At request time the API does not
+fetch the transaction receipt, validate this address against A, or use it as
+sender evidence. Omitting it does not change verification or settlement.
 
 ## Actions
 
