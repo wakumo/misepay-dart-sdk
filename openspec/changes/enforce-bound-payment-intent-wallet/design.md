@@ -1,40 +1,23 @@
 ## Context
-
-The SDK is used by Avacus DeFi Wallet, a customer wallet application. It reads public PaymentIntent resources and builds/submits customer point authorization or post-broadcast proof actions. It is not authenticated as merchant staff and must never mutate a merchant payment request.
-
-The API returns `points.authorization.holder_address` as canonical point-holder context. `payer` is a legacy compatibility projection only. The connected wallet is app-owned runtime state and must be supplied explicitly to SDK action calls. It must not be inferred from the resource or a caller-provided proof payload.
+The SDK is used by the Avacus customer wallet. `points.authorization.holder_address` is canonical point-holder context, while `payer` is a legacy compatibility projection. The EIP-712 point authorization itself contains the payer address. A post-broadcast proof contains a transaction hash, so sender identity can only be established from verified chain data.
 
 ## Decisions
 
-### Guard before all customer actions
+### Use signed authorization identity
 
-Introduce one internal eligibility guard used by `authorizePoints`, `applyPoints`, and `provePayment`:
+`authorizePoints` delegates to `PointAuthorizationService`, which derives the EIP-712 payer from canonical point authorization context before the legacy payer fallback. `applyPoints` compares the resulting authorization payer to the same holder context before sending HTTP and returns `POINT_AUTHORIZATION_HOLDER_MISMATCH` on inconsistency.
 
-```text
-terminal PaymentIntent -> PAYMENT_INTENT_NOT_ACTIONABLE
-bound holder differs from connected wallet -> PAYMENT_INTENT_WALLET_MISMATCH
-otherwise -> continue with current validation/action
-```
+No `connectedWalletAddress` parameter is needed. It would be duplicated app runtime state rather than an independent security boundary.
 
-The guard receives the explicitly connected wallet address, normalizes/checks it, and compares it to `paymentIntent.points?.authorization?.holderAddress`; it falls back to `paymentIntent.payer?.address` only while older API responses remain in circulation. An unbound intent remains eligible for B to inspect and use according to current point authorization rules.
+### Keep payment proof verification backend-owned
 
-The guard does not claim that connected wallet identity proves the on-chain sender. The API still verifies the eventual ERC-20 `Transfer.from` before settlement.
+`provePayment` forwards the transaction hash and optional payer rendering context. It does not validate wallet binding because it has no verified `Transfer.from`. The API scanner/proof worker remains authoritative.
 
-### Cancelled QR is terminal
+### Keep terminal actions resource-driven
 
-The API's nullable action URLs are the source of truth for terminal status. The SDK also checks the enum before using a retained `PaymentIntent` object so an old QR cannot submit stale actions if malformed or cached payloads contain action URLs. No action request is sent for terminal status.
-
-### Replacement begins with a new request URI
-
-The SDK provides no replacement function. The staff app may cancel/reissue separately. The integrating app discards its old PaymentIntent action state, obtains the new request URI from staff display/QR, then calls `get(requestUri: ...)`. The new resource has a distinct id and starts unbound. It is not B-bound merely because B scanned it.
+The SDK uses backend-provided nullable action URLs. A terminal or otherwise unavailable action has no URL and returns the existing `ACTION_UNAVAILABLE` error. The wallet app may also disable UI based on status, but that UI state is not represented as a second SDK identity guard.
 
 ## Risks / Trade-offs
 
-- Requiring connected-wallet context is a public SDK API change. It is necessary because the SDK otherwise cannot distinguish A from B safely. Version/documentation changes must make the migration explicit.
-- A normal external wallet can still transfer to an old ERC-20 QR. SDK prevention avoids induced stale submissions but cannot block the chain transfer; backend recovery policy owns it.
-
-## Rollout
-
-1. Publish API replacement and terminal-state contract.
-2. Publish SDK guard update.
-3. Update Avacus wallet integration to pass the currently connected wallet to SDK actions and refetch only staff-issued replacement request URIs.
+- A caller can manually construct inconsistent authorization data, so `applyPoints` checks holder consistency before HTTP; the backend still performs authoritative signature and state validation.
+- Legacy payloads without canonical points continue to use `payer.address` until compatibility support is removed separately.

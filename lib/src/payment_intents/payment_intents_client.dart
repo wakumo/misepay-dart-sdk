@@ -1,5 +1,4 @@
 import 'domain/payment_intent.dart';
-import 'domain/payment_intent_status.dart';
 import 'domain/payment_intent_repository.dart';
 import 'domain/point_authorization.dart';
 import '../core/misepay_exception.dart';
@@ -39,10 +38,8 @@ class PaymentIntentsClient {
   /// context, point limits, current point selection, and expiry data.
   PointAuthorization authorizePoints({
     required PaymentIntent paymentIntent,
-    required String connectedWalletAddress,
     required String pointAmount,
   }) {
-    _assertActionEligible(paymentIntent, connectedWalletAddress);
     return _pointAuthorizationService.build(
       intent: paymentIntent,
       pointAmount: pointAmount,
@@ -52,11 +49,10 @@ class PaymentIntentsClient {
   /// Submits a signed point authorization to [paymentIntent]'s action URL.
   Future<PaymentIntent> applyPoints({
     required PaymentIntent paymentIntent,
-    required String connectedWalletAddress,
     required PointAuthorization authorization,
     required String signature,
   }) {
-    _assertActionEligible(paymentIntent, connectedWalletAddress);
+    _assertAuthorizationHolderMatches(paymentIntent, authorization);
     return _repository.submitPointAuthorization(
       intent: paymentIntent,
       authorization: authorization,
@@ -70,13 +66,11 @@ class PaymentIntentsClient {
   /// sender evidence and is independent of the PaymentIntent point holder.
   Future<PaymentIntent> provePayment({
     required PaymentIntent paymentIntent,
-    required String connectedWalletAddress,
     required int chainId,
     required String tokenAddress,
     required String txHash,
     String? payerAddress,
   }) {
-    _assertActionEligible(paymentIntent, connectedWalletAddress);
     return _repository.submitTransactionHash(
       intent: paymentIntent,
       chainId: chainId,
@@ -86,33 +80,18 @@ class PaymentIntentsClient {
     );
   }
 
-  void _assertActionEligible(
+  void _assertAuthorizationHolderMatches(
     PaymentIntent paymentIntent,
-    String connectedWalletAddress,
+    PointAuthorization authorization,
   ) {
-    if (paymentIntent.status != PaymentIntentStatus.pending) {
+    final holderAddress = paymentIntent.points?.authorization?.holderAddress ??
+        paymentIntent.payer?.address;
+    if (holderAddress != null &&
+        holderAddress.toLowerCase() !=
+            authorization.payerAddress.toLowerCase()) {
       throw MisePayException(
-        'PAYMENT_INTENT_NOT_ACTIONABLE',
-        'PaymentIntent is not actionable in its current status.',
-      );
-    }
-
-    final normalizedConnectedWalletAddress =
-        connectedWalletAddress.toLowerCase();
-    if (normalizedConnectedWalletAddress.isEmpty) {
-      throw MisePayException(
-        'CONNECTED_WALLET_REQUIRED',
-        'Connected wallet address is required.',
-      );
-    }
-    final boundPayerAddress =
-        paymentIntent.points?.authorization?.holderAddress.toLowerCase() ??
-            paymentIntent.payer?.address?.toLowerCase();
-    if (boundPayerAddress != null &&
-        boundPayerAddress != normalizedConnectedWalletAddress) {
-      throw MisePayException(
-        'PAYMENT_INTENT_WALLET_MISMATCH',
-        'Connected wallet does not match the PaymentIntent point holder.',
+        'POINT_AUTHORIZATION_HOLDER_MISMATCH',
+        'Point authorization payer does not match the PaymentIntent point holder.',
       );
     }
   }

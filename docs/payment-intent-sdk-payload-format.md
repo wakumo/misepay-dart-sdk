@@ -16,7 +16,6 @@ final paymentIntent = await misepayClient.paymentIntents.get(
 
 final authorization = misepayClient.paymentIntents.authorizePoints(
   paymentIntent: paymentIntent,
-  connectedWalletAddress: connectedWalletAddress,
   pointAmount: '1200',
 );
 
@@ -24,7 +23,6 @@ final signature = await signer.signTypedData(authorization.typedData);
 
 final updatedPaymentIntent = await misepayClient.paymentIntents.applyPoints(
   paymentIntent: paymentIntent,
-  connectedWalletAddress: connectedWalletAddress,
   authorization: authorization,
   signature: signature,
 );
@@ -33,11 +31,10 @@ final selectedOption = updatedPaymentIntent.paymentOptions.first;
 
 await misepayClient.paymentIntents.provePayment(
   paymentIntent: updatedPaymentIntent,
-  connectedWalletAddress: connectedWalletAddress,
   chainId: selectedOption.chainId,
   tokenAddress: selectedOption.tokenAddress,
   txHash: txHash,
-  payerAddress: connectedWalletAddress,
+  payerAddress: payerAddress,
 );
 ```
 
@@ -50,7 +47,7 @@ await misepayClient.paymentIntents.provePayment(
 - The SDK validates origin only, not path. The backend route remains opaque to the SDK.
 - If `payerAddress` is provided, the SDK appends `payer_address` to the initial GET URL.
 - `PaymentIntent.points` is canonical point context. `PaymentIntent.payer` is a nullable legacy projection during the compatibility window; neither is connected-wallet state. Once A is bound, switching the app wallet to B does not replace A.
-- `authorizePoints`, `applyPoints`, and `provePayment` require the app's explicit `connectedWalletAddress`. The SDK resolves the bound holder from canonical `points.authorization.holder_address`, with legacy `payer.address` as a compatibility fallback, then rejects a non-pending resource with `PAYMENT_INTENT_NOT_ACTIONABLE` and a different connected wallet with `PAYMENT_INTENT_WALLET_MISMATCH`, before signing or HTTP.
+- `authorizePoints` derives the EIP-712 `payer` from canonical `points.authorization.holder_address`, with legacy `payer.address` as a compatibility fallback. `applyPoints` rejects an authorization whose signed payer differs from that holder before HTTP. The SDK does not require separate connected-wallet runtime state.
 - The public SDK cannot cancel or replace a PaymentIntent. A customer must ask authenticated merchant staff to cancel the old attempt and issue a new QR/request URI; Wallet B may act only after fetching that distinct new resource.
 - Follow-up API calls MUST use response `actions` URLs.
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.
@@ -325,7 +322,7 @@ it as sender evidence. Omitting it does not change verification or settlement.
 
 ## Actions
 
-Action keys are stable, but values may be null when an action is unavailable for the current pending PaymentIntent state. SDK methods fail locally with `ACTION_UNAVAILABLE` when the requested action URL is null. They fail with `PAYMENT_INTENT_NOT_ACTIONABLE` before checking a stale action URL on a `completed`, `expired`, `cancelled`, or `review_required` resource.
+Action keys are stable, but values may be null when an action is unavailable for the current PaymentIntent state. SDK methods fail locally with `ACTION_UNAVAILABLE` when the requested action URL is null. The backend response and action URLs remain authoritative for terminal-state eligibility.
 
 ## SDK Environment And Origin Settings
 

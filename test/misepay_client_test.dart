@@ -197,7 +197,6 @@ void main() {
 
       final authorization = client.paymentIntents.authorizePoints(
         paymentIntent: intent,
-        connectedWalletAddress: '0xHolderA',
         pointAmount: '2',
       );
 
@@ -223,7 +222,6 @@ void main() {
 
       final authorization = client.paymentIntents.authorizePoints(
         paymentIntent: intent,
-        connectedWalletAddress: '0xHolderA',
         pointAmount: '2',
       );
 
@@ -246,7 +244,6 @@ void main() {
 
       final authorization = client.paymentIntents.authorizePoints(
         paymentIntent: intent,
-        connectedWalletAddress: intent.payer?.address ?? '0xabc',
         pointAmount: '2',
       );
 
@@ -306,7 +303,6 @@ void main() {
 
         final authorization = client.paymentIntents.authorizePoints(
           paymentIntent: intent,
-          connectedWalletAddress: intent.payer?.address ?? '0xabc',
           pointAmount: '100',
         );
 
@@ -332,7 +328,6 @@ void main() {
 
       final authorization = client.paymentIntents.authorizePoints(
         paymentIntent: intent,
-        connectedWalletAddress: '0xabc',
         pointAmount: '2',
       );
 
@@ -369,7 +364,6 @@ void main() {
       expect(
         () => client.paymentIntents.authorizePoints(
           paymentIntent: intent,
-          connectedWalletAddress: intent.payer?.address ?? '0xabc',
           pointAmount: '2',
         ),
         throwsA(isA<MisePayException>()
@@ -385,7 +379,6 @@ void main() {
       expect(
         () => client.paymentIntents.authorizePoints(
           paymentIntent: intent,
-          connectedWalletAddress: intent.payer?.address ?? '0xabc',
           pointAmount: '2',
         ),
         throwsA(isA<MisePayException>()
@@ -410,7 +403,6 @@ void main() {
         expect(
           () => client.paymentIntents.authorizePoints(
             paymentIntent: intent,
-            connectedWalletAddress: intent.payer?.address ?? '0xabc',
             pointAmount: malformedPointAmount,
           ),
           throwsA(isA<MisePayException>()
@@ -422,7 +414,6 @@ void main() {
             .authorizePoints(
                 paymentIntent: PaymentIntent.fromJson(
                     _paymentIntentJson(payer: _payerJson(intentAmount: '2'))),
-                connectedWalletAddress: '0xabc',
                 pointAmount: '0')
             .message['pointAmount'],
         '0',
@@ -431,7 +422,6 @@ void main() {
         () => client.paymentIntents.authorizePoints(
           paymentIntent: PaymentIntent.fromJson(_paymentIntentJson(
               payer: _payerJson(maxAmount: '20'), gross: '10.5')),
-          connectedWalletAddress: '0xabc',
           pointAmount: '11',
         ),
         returnsNormally,
@@ -439,7 +429,6 @@ void main() {
       expect(
         () => client.paymentIntents.authorizePoints(
           paymentIntent: intent,
-          connectedWalletAddress: intent.payer?.address ?? '0xabc',
           pointAmount: '2',
         ),
         returnsNormally,
@@ -448,7 +437,6 @@ void main() {
         () => client.paymentIntents.authorizePoints(
           paymentIntent: PaymentIntent.fromJson(
               _paymentIntentJson(payer: _payerJson(intentAmount: '2'))),
-          connectedWalletAddress: '0xabc',
           pointAmount: '2',
         ),
         throwsA(isA<MisePayException>()
@@ -490,7 +478,6 @@ void main() {
 
         final authorization = client.paymentIntents.authorizePoints(
           paymentIntent: intent,
-          connectedWalletAddress: intent.payer?.address ?? '0xabc',
           pointAmount: transition.target,
         );
 
@@ -900,7 +887,7 @@ void main() {
 
   group('PaymentIntent action submissions', () {
     test(
-        'rejects every action from a different connected wallet before signing or HTTP',
+        'rejects point authorization signed for a different holder before HTTP',
         () async {
       final requests = <http.Request>[];
       final client = MisePayClient(
@@ -912,124 +899,25 @@ void main() {
       );
       final json = _paymentIntentJson(points: _pointsJson())..remove('payer');
       final intent = PaymentIntent.fromJson(json);
-
-      expect(
-        () => client.paymentIntents.authorizePoints(
-          paymentIntent: intent,
-          connectedWalletAddress: '0xWalletB',
-          pointAmount: '2',
-        ),
-        throwsA(isA<MisePayException>().having(
-          (error) => error.code,
-          'code',
-          'PAYMENT_INTENT_WALLET_MISMATCH',
-        )),
-      );
-
       const authorization = PointAuthorization(
-        payerAddress: '0xHolderA',
+        payerAddress: '0xWalletB',
         pointAmount: '2',
         authorizationRevision: 1,
         typedData: {},
       );
+
       expect(
         () => client.paymentIntents.applyPoints(
           paymentIntent: intent,
-          connectedWalletAddress: '0xWalletB',
           authorization: authorization,
           signature: '0xsig',
         ),
         throwsA(isA<MisePayException>().having(
           (error) => error.code,
           'code',
-          'PAYMENT_INTENT_WALLET_MISMATCH',
+          'POINT_AUTHORIZATION_HOLDER_MISMATCH',
         )),
       );
-      expect(
-        () => client.paymentIntents.provePayment(
-          paymentIntent: intent,
-          connectedWalletAddress: '0xWalletB',
-          chainId: 137,
-          tokenAddress: '0xJPYCPolygon',
-          txHash: '0xtx',
-        ),
-        throwsA(isA<MisePayException>().having(
-          (error) => error.code,
-          'code',
-          'PAYMENT_INTENT_WALLET_MISMATCH',
-        )),
-      );
-      expect(requests, isEmpty);
-    });
-
-    test(
-        'rejects every action on a terminal PaymentIntent before signing or HTTP',
-        () async {
-      final requests = <http.Request>[];
-      final client = MisePayClient(
-        allowedOrigins: {'https://api-dev.misepay.app'},
-        httpClient: MockClient((request) async {
-          requests.add(request);
-          return _jsonResponse(_paymentIntentJson());
-        }),
-      );
-      const authorization = PointAuthorization(
-        payerAddress: '0xHolderA',
-        pointAmount: '2',
-        authorizationRevision: 1,
-        typedData: {},
-      );
-
-      for (final status in [
-        PaymentIntentStatus.completed,
-        PaymentIntentStatus.expired,
-        PaymentIntentStatus.cancelled,
-        PaymentIntentStatus.reviewRequired,
-      ]) {
-        final intent = PaymentIntent.fromJson(
-          _paymentIntentJson(
-              payer: _payerJson(address: '0xHolderA'), status: status.value),
-        );
-        expect(
-          () => client.paymentIntents.authorizePoints(
-            paymentIntent: intent,
-            connectedWalletAddress: '0xHolderA',
-            pointAmount: '2',
-          ),
-          throwsA(isA<MisePayException>().having(
-            (error) => error.code,
-            'code',
-            'PAYMENT_INTENT_NOT_ACTIONABLE',
-          )),
-        );
-        expect(
-          () => client.paymentIntents.applyPoints(
-            paymentIntent: intent,
-            connectedWalletAddress: '0xHolderA',
-            authorization: authorization,
-            signature: '0xsig',
-          ),
-          throwsA(isA<MisePayException>().having(
-            (error) => error.code,
-            'code',
-            'PAYMENT_INTENT_NOT_ACTIONABLE',
-          )),
-        );
-        expect(
-          () => client.paymentIntents.provePayment(
-            paymentIntent: intent,
-            connectedWalletAddress: '0xHolderA',
-            chainId: 137,
-            tokenAddress: '0xJPYCPolygon',
-            txHash: '0xtx',
-          ),
-          throwsA(isA<MisePayException>().having(
-            (error) => error.code,
-            'code',
-            'PAYMENT_INTENT_NOT_ACTIONABLE',
-          )),
-        );
-      }
       expect(requests, isEmpty);
     });
 
@@ -1071,12 +959,10 @@ void main() {
       );
       final authorization = client.paymentIntents.authorizePoints(
         paymentIntent: replacement,
-        connectedWalletAddress: '0xWalletB',
         pointAmount: '2',
       );
       final updated = await client.paymentIntents.applyPoints(
         paymentIntent: replacement,
-        connectedWalletAddress: '0xWalletB',
         authorization: authorization,
         signature: '0xsig',
       );
@@ -1102,13 +988,11 @@ void main() {
           _paymentIntentJson(payer: _payerJson(intentAmount: '0')));
       final authorization = client.paymentIntents.authorizePoints(
         paymentIntent: intent,
-        connectedWalletAddress: intent.payer?.address ?? '0xabc',
         pointAmount: '2',
       );
 
       final updated = await client.paymentIntents.applyPoints(
         paymentIntent: intent,
-        connectedWalletAddress: intent.payer?.address ?? '0xabc',
         authorization: authorization,
         signature: '0xsig',
       );
@@ -1156,13 +1040,11 @@ void main() {
       ));
       final authorization = client.paymentIntents.authorizePoints(
         paymentIntent: intent,
-        connectedWalletAddress: intent.payer?.address ?? '0xabc',
         pointAmount: '100',
       );
 
       final updated = await client.paymentIntents.applyPoints(
         paymentIntent: intent,
-        connectedWalletAddress: intent.payer?.address ?? '0xabc',
         authorization: authorization,
         signature: '0xsig',
       );
@@ -1211,7 +1093,6 @@ void main() {
 
       final updated = await client.paymentIntents.provePayment(
         paymentIntent: intent,
-        connectedWalletAddress: intent.payer?.address ?? '0xabc',
         chainId: 137,
         tokenAddress: '0xJPYCPolygon',
         txHash: '0xtx',
@@ -1249,7 +1130,6 @@ void main() {
 
       await client.paymentIntents.provePayment(
         paymentIntent: intent,
-        connectedWalletAddress: intent.payer?.address ?? '0xabc',
         chainId: 137,
         tokenAddress: '0xJPYCPolygon',
         txHash: '0xtx',
@@ -1283,14 +1163,12 @@ void main() {
       ));
       final authorization = client.paymentIntents.authorizePoints(
         paymentIntent: intent,
-        connectedWalletAddress: intent.payer?.address ?? '0xabc',
         pointAmount: '2',
       );
 
       await expectLater(
         client.paymentIntents.applyPoints(
           paymentIntent: intent,
-          connectedWalletAddress: intent.payer?.address ?? '0xabc',
           authorization: authorization,
           signature: '0xsig',
         ),
@@ -1322,7 +1200,6 @@ void main() {
       await expectLater(
         client.paymentIntents.provePayment(
           paymentIntent: intent,
-          connectedWalletAddress: intent.payer?.address ?? '0xabc',
           chainId: 137,
           tokenAddress: '0xJPYCPolygon',
           txHash: '0xtx',
@@ -1354,7 +1231,6 @@ void main() {
       await expectLater(
         client.paymentIntents.provePayment(
           paymentIntent: intent,
-          connectedWalletAddress: intent.payer?.address ?? '0xabc',
           chainId: 137,
           tokenAddress: '0xJPYCPolygon',
           txHash: '0xtx',
@@ -1386,14 +1262,12 @@ void main() {
       ));
       final authorization = client.paymentIntents.authorizePoints(
         paymentIntent: intent,
-        connectedWalletAddress: intent.payer?.address ?? '0xabc',
         pointAmount: '2',
       );
 
       await expectLater(
         client.paymentIntents.applyPoints(
           paymentIntent: intent,
-          connectedWalletAddress: intent.payer?.address ?? '0xabc',
           authorization: authorization,
           signature: '0xsig',
         ),
@@ -1423,7 +1297,6 @@ void main() {
       await expectLater(
         client.paymentIntents.provePayment(
           paymentIntent: intent,
-          connectedWalletAddress: intent.payer?.address ?? '0xabc',
           chainId: 137,
           tokenAddress: '0xJPYCPolygon',
           txHash: '0xtx',
@@ -1452,14 +1325,12 @@ void main() {
           PaymentIntent.fromJson(_paymentIntentJson(payer: _payerJson()));
       final authorization = client.paymentIntents.authorizePoints(
         paymentIntent: intent,
-        connectedWalletAddress: intent.payer?.address ?? '0xabc',
         pointAmount: '2',
       );
 
       await expectLater(
         client.paymentIntents.applyPoints(
           paymentIntent: intent,
-          connectedWalletAddress: intent.payer?.address ?? '0xabc',
           authorization: authorization,
           signature: '0xbad',
         ),

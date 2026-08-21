@@ -251,9 +251,7 @@ invented terminal time.
 When a customer asks to switch wallets, only an authenticated MisePay staff
 member can cancel and replace the payment attempt. The wallet SDK has no
 replacement or cancellation authority. Staff provides a distinct new QR and
-`requestUri`; discard the cancelled resource and never reuse its URI. A token
-transfer sent to an old QR remains a backend recovery/refund-on-request case,
-not a payment of the new attempt.
+`requestUri`; discard the cancelled resource and never reuse its actions.
 
 ## Point Authorization
 
@@ -265,7 +263,6 @@ independent of the selected chain or payment option.
 ```dart
 final authorization = client.paymentIntents.authorizePoints(
   paymentIntent: paymentIntent,
-  connectedWalletAddress: connectedWalletAddress,
   pointAmount: '1200',
 );
 
@@ -274,7 +271,6 @@ final signature = await signer.signTypedData(typedData);
 
 final updatedIntent = await client.paymentIntents.applyPoints(
   paymentIntent: paymentIntent,
-  connectedWalletAddress: connectedWalletAddress,
   authorization: authorization,
   signature: signature,
 );
@@ -308,11 +304,10 @@ After sending the on-chain payment, submit the transaction hash to the action UR
 ```dart
 final paidIntent = await client.paymentIntents.provePayment(
   paymentIntent: updatedIntent,
-  connectedWalletAddress: connectedWalletAddress,
   chainId: 137,
   tokenAddress: '0xJPYCPolygon',
   txHash: '0xtx',
-  payerAddress: connectedWalletAddress,
+  payerAddress: payerAddress,
 );
 ```
 
