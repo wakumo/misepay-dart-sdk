@@ -22,18 +22,18 @@ The Avacus wallet SDK already builds EIP-712 point authorization with a payer ad
 - Derive the EIP-712 payer from canonical `points.authorization.holder_address`, with legacy `payer.address` only as a compatibility fallback.
 - Before HTTP submission, reject a point authorization whose payer differs from the PaymentIntent holder.
 - Leave proof sender verification to the API's verified ERC-20 `Transfer.from` processing.
-- Keep cancellation and replacement outside the public SDK.
+- Keep cancellation and PaymentIntent creation outside the public SDK.
 
 ## Acceptance Criteria
 
 - Point authorization construction uses the PaymentIntent's canonical holder context without separate wallet state.
 - `applyPoints` fails locally with `POINT_AUTHORIZATION_HOLDER_MISMATCH` when the authorization payer differs from the canonical holder and makes no HTTP request.
 - `provePayment` submits only the transaction hash and optional rendering context; it does not claim to validate the sender locally.
-- The SDK exposes no cancellation or replacement method.
+- The SDK exposes no cancellation or PaymentIntent creation method.
 
 ## Out of Scope
 
-- Staff replacement API calls or staff UI.
+- Staff cancellation or PaymentIntent creation APIs and UI.
 - Client-side verification of an on-chain transaction sender.
 - Split payment, sponsored payment, or payer handoff.
 

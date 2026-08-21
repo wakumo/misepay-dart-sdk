@@ -48,7 +48,7 @@ await misepayClient.paymentIntents.provePayment(
 - If `payerAddress` is provided, the SDK appends `payer_address` to the initial GET URL.
 - `PaymentIntent.points` is canonical point context. `PaymentIntent.payer` is a nullable legacy projection during the compatibility window; neither is connected-wallet state. Once A is bound, switching the app wallet to B does not replace A.
 - `authorizePoints` derives the EIP-712 `payer` from canonical `points.authorization.holder_address`, with legacy `payer.address` as a compatibility fallback. `applyPoints` rejects an authorization whose signed payer differs from that holder before HTTP. The SDK does not require separate connected-wallet runtime state.
-- The public SDK cannot cancel or replace a PaymentIntent. A customer must ask authenticated merchant staff to cancel the old attempt and issue a new QR/request URI; Wallet B may act only after fetching that distinct new resource.
+- The public SDK cannot cancel or create a PaymentIntent. Those remain separate existing MisePay operations; Wallet B may authorize points only after fetching a distinct newly created resource.
 - Follow-up API calls MUST use response `actions` URLs.
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.
 - The SDK accepts PaymentIntent payload version `1` and rejects any other version with `UNSUPPORTED_PAYMENT_INTENT_VERSION` before using payment instructions or actions.
@@ -206,9 +206,8 @@ from persisted settlement truth, not the optional proof `payerAddress`.
 
 Initial fetches, polling responses, and action responses use this same resource
 shape. Replace local state with each returned PaymentIntent and use its
-`requestUri` for the next poll. When the backend creates a replacement intent
-after expiry, use the replacement resource's new `requestUri` to generate the
-new QR; do not reuse the expired URI.
+`requestUri` for the next poll. When a new intent is created after expiry, use
+its new `requestUri` to generate the new QR; do not reuse the expired URI.
 
 The API requires `order_id`, `created_at`, `completed_at`, `cancelled_at`,
 `merchant.image_url`, and `store.image_url` on the canonical response. The SDK

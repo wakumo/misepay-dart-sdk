@@ -248,10 +248,9 @@ with `cancelled`. Either value can be null for historical data or during a
 staggered backend rollout; do not substitute `createdAt` or `expiresAt` as an
 invented terminal time.
 
-When a customer asks to switch wallets, only an authenticated MisePay staff
-member can cancel and replace the payment attempt. The wallet SDK has no
-replacement or cancellation authority. Staff provides a distinct new QR and
-`requestUri`; discard the cancelled resource and never reuse its actions.
+When a customer asks to switch wallets, the wallet SDK does not cancel or
+create PaymentIntents. Those operations remain separate existing MisePay
+flows. Discard a cancelled resource and never reuse its actions.
 
 ## Point Authorization
 
@@ -293,9 +292,8 @@ Keep these unit domains separate:
 The backend locks current PaymentIntent state and recomputes remaining value, balance, benefit, net amount, and settlement base units when the signed authorization is submitted. Do not convert any of these string values to floating point.
 
 While the PaymentIntent remains pending, the same holder may increase, decrease, clear, or reapply points within the returned `authorization.maxAmount`. An unchanged selection is a local `POINT_AMOUNT_UNCHANGED` no-op. The holder remains bound after clearing to zero.
-Another connected wallet cannot edit that holder's target. It must ask staff to
-replace the attempt, then fetch the staff-issued replacement URI before it can
-authorize its own points.
+Another wallet cannot edit that holder's target. It can authorize its own
+points only on a separately created PaymentIntent.
 
 ## Payment Proof
 
