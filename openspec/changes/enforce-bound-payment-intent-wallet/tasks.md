@@ -14,6 +14,8 @@
 
 - [x] 7. Run `dart test`, `dart analyze`, `dart format --output=none --set-exit-if-changed .`, `git diff --check`, and `openspec validate enforce-bound-payment-intent-wallet --strict`; record exact outcomes. (verification: unit - all commands passed outside the sandbox on 2026-08-21; the sandboxed Dart VM remains unavailable)
 
+- [x] 8. Resolve bound wallet identity from canonical `points.authorization.holder_address` before the legacy `payer` projection. Add canonical-only regression coverage for Wallet B rejection before signing or HTTP. (verification: unit - targeted regression fails against legacy-only guard before the fix)
+
 ## Future Work
 
 - Update the Avacus application integration to pass actual connected-wallet context to all SDK actions.

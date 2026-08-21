@@ -2,7 +2,7 @@
 
 The SDK is used by Avacus DeFi Wallet, a customer wallet application. It reads public PaymentIntent resources and builds/submits customer point authorization or post-broadcast proof actions. It is not authenticated as merchant staff and must never mutate a merchant payment request.
 
-The API returns `payer` as point-holder context. The connected wallet is app-owned runtime state and must be supplied explicitly to SDK action calls. It must not be inferred from the resource or a caller-provided proof payload.
+The API returns `points.authorization.holder_address` as canonical point-holder context. `payer` is a legacy compatibility projection only. The connected wallet is app-owned runtime state and must be supplied explicitly to SDK action calls. It must not be inferred from the resource or a caller-provided proof payload.
 
 ## Decisions
 
@@ -16,7 +16,7 @@ bound holder differs from connected wallet -> PAYMENT_INTENT_WALLET_MISMATCH
 otherwise -> continue with current validation/action
 ```
 
-The guard receives the explicitly connected wallet address, normalizes/checks it, and compares it to `paymentIntent.payer?.address` only when the API identifies a bound point holder. An unbound intent remains eligible for B to inspect and use according to current point authorization rules.
+The guard receives the explicitly connected wallet address, normalizes/checks it, and compares it to `paymentIntent.points?.authorization?.holderAddress`; it falls back to `paymentIntent.payer?.address` only while older API responses remain in circulation. An unbound intent remains eligible for B to inspect and use according to current point authorization rules.
 
 The guard does not claim that connected wallet identity proves the on-chain sender. The API still verifies the eventual ERC-20 `Transfer.from` before settlement.
 

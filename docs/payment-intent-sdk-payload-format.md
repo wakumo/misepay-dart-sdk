@@ -50,7 +50,7 @@ await misepayClient.paymentIntents.provePayment(
 - The SDK validates origin only, not path. The backend route remains opaque to the SDK.
 - If `payerAddress` is provided, the SDK appends `payer_address` to the initial GET URL.
 - `PaymentIntent.points` is canonical point context. `PaymentIntent.payer` is a nullable legacy projection during the compatibility window; neither is connected-wallet state. Once A is bound, switching the app wallet to B does not replace A.
-- `authorizePoints`, `applyPoints`, and `provePayment` require the app's explicit `connectedWalletAddress`. The SDK rejects a non-pending resource with `PAYMENT_INTENT_NOT_ACTIONABLE` and a connected wallet that differs from the bound holder with `PAYMENT_INTENT_WALLET_MISMATCH`, before signing or HTTP.
+- `authorizePoints`, `applyPoints`, and `provePayment` require the app's explicit `connectedWalletAddress`. The SDK resolves the bound holder from canonical `points.authorization.holder_address`, with legacy `payer.address` as a compatibility fallback, then rejects a non-pending resource with `PAYMENT_INTENT_NOT_ACTIONABLE` and a different connected wallet with `PAYMENT_INTENT_WALLET_MISMATCH`, before signing or HTTP.
 - The public SDK cannot cancel or replace a PaymentIntent. A customer must ask authenticated merchant staff to cancel the old attempt and issue a new QR/request URI; Wallet B may act only after fetching that distinct new resource.
 - Follow-up API calls MUST use response `actions` URLs.
 - The SDK MUST NOT compose follow-up URLs by appending paths to `requestUri`.

@@ -35,8 +35,8 @@ class PaymentIntentsClient {
   /// Builds EIP-712 point authorization typed data for [paymentIntent].
   ///
   /// [pointAmount] must be a non-negative integer string. The full
-  /// [paymentIntent] is required because validation uses payer, point limits,
-  /// current point selection, and expiry data.
+  /// [paymentIntent] is required because validation uses canonical point-holder
+  /// context, point limits, current point selection, and expiry data.
   PointAuthorization authorizePoints({
     required PaymentIntent paymentIntent,
     required String connectedWalletAddress,
@@ -105,7 +105,9 @@ class PaymentIntentsClient {
         'Connected wallet address is required.',
       );
     }
-    final boundPayerAddress = paymentIntent.payer?.address?.toLowerCase();
+    final boundPayerAddress =
+        paymentIntent.points?.authorization?.holderAddress.toLowerCase() ??
+            paymentIntent.payer?.address?.toLowerCase();
     if (boundPayerAddress != null &&
         boundPayerAddress != normalizedConnectedWalletAddress) {
       throw MisePayException(

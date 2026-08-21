@@ -197,7 +197,7 @@ void main() {
 
       final authorization = client.paymentIntents.authorizePoints(
         paymentIntent: intent,
-        connectedWalletAddress: intent.payer?.address ?? '0xabc',
+        connectedWalletAddress: '0xHolderA',
         pointAmount: '2',
       );
 
@@ -910,9 +910,8 @@ void main() {
           return _jsonResponse(_paymentIntentJson());
         }),
       );
-      final intent = PaymentIntent.fromJson(
-        _paymentIntentJson(payer: _payerJson(address: '0xHolderA')),
-      );
+      final json = _paymentIntentJson(points: _pointsJson())..remove('payer');
+      final intent = PaymentIntent.fromJson(json);
 
       expect(
         () => client.paymentIntents.authorizePoints(
