@@ -13,6 +13,10 @@ No `connectedWalletAddress` parameter is needed. It would be duplicated app runt
 
 `provePayment` forwards the transaction hash and optional payer rendering context. It does not validate wallet binding because it has no verified `Transfer.from`. The API scanner/proof worker remains authoritative.
 
+### Keep viewer account separate from authorization
+
+`payerAddress` remains the SDK parameter for requesting point-account viewer context. When B fetches an A-bound PaymentIntent, `points.account` represents B while `points.authorization` and legacy `payer` remain A. The SDK preserves these fields as returned and does not treat the account snapshot as authorization identity.
+
 ### Keep terminal actions resource-driven
 
 The SDK uses backend-provided nullable action URLs. A terminal or otherwise unavailable action has no URL and returns the existing `ACTION_UNAVAILABLE` error. The wallet app may also disable UI based on status, but that UI state is not represented as a second SDK identity guard.

@@ -103,14 +103,14 @@ When no point holder is bound and the PaymentIntent is fetched without
 ```
 
 When no holder is bound, `payerAddress` requests non-persisted preview context.
-After A authorizes points, `points` is canonical and identifies A even if
-connected wallet B supplies a query or proof context. `payer` remains a legacy
-nullable projection of the prior shape:
+After A authorizes points, fetching with `payerAddress` set to B renders B's
+live account under `points.account`. The persisted authorization and legacy
+`payer` remain A; viewing the resource does not rebind it:
 
 ```json
 {
   "payer": {
-    "address": "0xabc...",
+    "address": "0xHolderA...",
     "point": {
       "label": "MisePay Points",
       "balance": { "available": "5000" },
@@ -127,16 +127,16 @@ nullable projection of the prior shape:
   },
   "points": {
     "account": {
-      "holder_address": "0xabc...",
+      "holder_address": "0xViewerB...",
       "label": "MisePay Points",
-      "available_balance": "5000",
+      "available_balance": "9000",
       "expiring_soon_lot": {
-        "amount": "21000",
+        "amount": "9000",
         "expires_at": "2026-10-15T00:00:00Z"
       }
     },
     "authorization": {
-      "holder_address": "0xabc...",
+      "holder_address": "0xHolderA...",
       "amount": "1200",
       "maximum_amount": "3000",
       "revision": 1,
@@ -165,12 +165,13 @@ Merchant image, then a local placeholder. Handle image load errors directly;
 do not issue HTTP `HEAD` requests to probe whether an image URL exists.
 
 `points.account` and top-level `reward` are nullable additive context. During
-a pending checkout, `points.account.expiringSoonLot` is the holder's
+a pending checkout, `points.account.expiringSoonLot` is the viewing wallet's
 earliest-expiring usable lot. Terminal PaymentIntents return `points.account`
 as null but retain durable authorization history. After token settlement,
-`confirmedPayments[].fromAddress` identifies verified sender B and `reward`
-identifies B when an Order reward exists. Neither display projection is
-a ledger identifier or executable payment amount.
+`confirmedPayments[].fromAddress` identifies the verified sender. For an
+A-bound point attempt, successful settlement requires that sender to be A;
+another sender remains unmatched. Neither display projection is a ledger
+identifier or executable payment amount.
 
 Serialize typed response data when you need to cache, log, debug, or pass data across app layers:
 
