@@ -170,6 +170,11 @@ returns B under `points.account` while authorization and legacy `payer` remain A
       "expiring_soon_lot": {
         "amount": "9000",
         "expires_at": "2026-10-15T00:00:00Z"
+      },
+      "next_expiration": {
+        "amount": "9000",
+        "valid_through": "2026-10-15",
+        "expires_at": "2026-10-16T00:00:00+09:00"
       }
     },
     "authorization": {
@@ -225,12 +230,13 @@ benefit statuses remain backend-only.
 date. Its `valid_through` string is the final usable `Asia/Tokyo` date and must
 not be converted through the device timezone; `expires_at` is the exclusive
 instant for comparisons. `expiring_soon_lot` remains for backend-first
-compatibility and is not recommended for new integrations. Top-level `reward` is an optional display
-projection. The SDK parses either an absent or explicit null value as null and
-serializes them as `expiring_soon_lot` and `reward`. They are never
-signed, never sent in an authorization or proof request, and do not replace
-payment receipts or the point ledger. `reward.recipient_address` comes
-from persisted settlement truth, not the optional proof `payerAddress`.
+compatibility and is not recommended for new integrations. The SDK maps an
+absent or explicit-null `next_expiration` to nullable `nextExpiration` and
+serializes a missing value as `next_expiration: null`. Top-level `reward` is an
+optional display projection. These fields are never signed, never sent in an
+authorization or proof request, and do not replace payment receipts or the
+point ledger. `reward.recipient_address` comes from persisted settlement truth,
+not the optional proof `payerAddress`.
 
 Initial fetches, polling responses, and action responses use this same resource
 shape. Replace local state with each returned PaymentIntent and use its

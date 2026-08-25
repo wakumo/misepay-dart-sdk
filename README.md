@@ -137,6 +137,11 @@ live account under `points.account`. The persisted authorization and legacy
       "expiring_soon_lot": {
         "amount": "9000",
         "expires_at": "2026-10-15T00:00:00Z"
+      },
+      "next_expiration": {
+        "amount": "9000",
+        "valid_through": "2026-10-15",
+        "expires_at": "2026-10-16T00:00:00+09:00"
       }
     },
     "authorization": {
@@ -172,9 +177,11 @@ do not issue HTTP `HEAD` requests to probe whether an image URL exists.
 a pending checkout, `points.account.nextExpiration` aggregates all eligible
 points sharing the earliest expiration date. Render `validThrough` as the last
 usable date in Japan time and compare the current instant with exclusive
-`expiresAt`. `expiringSoonLot` remains for compatibility and is not recommended
-for new integrations. Terminal PaymentIntents return `points.account`
-as null but retain durable authorization history. After token settlement,
+`expiresAt`. When no positive usable lot exists, the backend returns
+`next_expiration: null` and the SDK exposes `nextExpiration == null`.
+`expiringSoonLot` remains for compatibility and is not recommended for new
+integrations. Terminal PaymentIntents return `points.account` as null but retain
+durable authorization history. After token settlement,
 `confirmedPayments[].fromAddress` identifies the verified sender. For an
 A-bound point attempt, successful settlement requires that sender to be A;
 another sender remains unmatched. Neither display projection is a ledger
