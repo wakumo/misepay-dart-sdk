@@ -532,9 +532,14 @@ void main() {
       final json = _paymentIntentJson(points: _pointsJson())..remove('payer');
 
       final intent = PaymentIntent.fromJson(json);
+      final expectedPoints = _pointsJson();
+      final expectedAccount = expectedPoints['account'] as Map<String, Object>;
 
       expect(intent.payer, isNull);
-      expect(intent.toJson()['points'], _pointsJson());
+      expect(intent.toJson()['points'], {
+        ...expectedPoints,
+        'account': {...expectedAccount, 'next_expiration': null},
+      });
       expect(intent.toJson()['amount'], {
         'currency': 'JPY',
         'gross': '10',
