@@ -69,6 +69,7 @@ class PaymentIntentPointAccount {
     required this.label,
     required this.availableBalance,
     this.expiringSoonLot,
+    this.nextExpiration,
   });
 
   /// Parses point-account context from API JSON.
@@ -81,6 +82,10 @@ class PaymentIntentPointAccount {
             ? null
             : PointExpiringSoonLot.fromJson(
                 json['expiring_soon_lot'] as Map<String, dynamic>),
+        nextExpiration: json['next_expiration'] == null
+            ? null
+            : PointNextExpiration.fromJson(
+                json['next_expiration'] as Map<String, dynamic>),
       );
 
   /// Point-account holder address.
@@ -95,13 +100,59 @@ class PaymentIntentPointAccount {
   /// Earliest-expiring usable lot while the PaymentIntent remains pending.
   final PointExpiringSoonLot? expiringSoonLot;
 
+  /// Earliest JST validity date and total points expiring after that date.
+  final PointNextExpiration? nextExpiration;
+
   /// Serializes this value back to API-shaped JSON.
   Map<String, dynamic> toJson() => {
         'holder_address': holderAddress,
         'label': label,
         'available_balance': availableBalance,
         'expiring_soon_lot': expiringSoonLot?.toJson(),
+        'next_expiration': nextExpiration?.toJson(),
       };
+}
+
+/// Aggregated points sharing the earliest expiration date in Japan time.
+class PointNextExpiration {
+  /// Creates an immutable next-expiration value.
+  const PointNextExpiration({
+    required this.amount,
+    required this.validThrough,
+    required this.expiresAt,
+  });
+
+  /// Parses a canonical next-expiration response.
+  factory PointNextExpiration.fromJson(Map<String, dynamic> json) =>
+      PointNextExpiration(
+        amount: json['amount'] as String,
+        validThrough: json['valid_through'] as String,
+        expiresAt: DateTime.parse(json['expires_at'] as String),
+      );
+
+  /// Total points expiring at this boundary, represented as an integer string.
+  final String amount;
+
+  /// Last calendar date on which these points are usable in Asia/Tokyo.
+  final String validThrough;
+
+  /// Exclusive expiration instant. Compare the current instant with this value.
+  final DateTime expiresAt;
+
+  /// Serializes this value back to API-shaped JSON.
+  Map<String, dynamic> toJson() => {
+        'amount': amount,
+        'valid_through': validThrough,
+        'expires_at': _formatJstTimestamp(expiresAt),
+      };
+}
+
+String _formatJstTimestamp(DateTime value) {
+  final jst = value.toUtc().add(const Duration(hours: 9));
+  String two(int part) => part.toString().padLeft(2, '0');
+  String three(int part) => part.toString().padLeft(3, '0');
+  return '${jst.year.toString().padLeft(4, '0')}-${two(jst.month)}-${two(jst.day)}'
+      'T${two(jst.hour)}:${two(jst.minute)}:${two(jst.second)}.${three(jst.millisecond)}+09:00';
 }
 
 /// Current point-authorization state for a PaymentIntent.
