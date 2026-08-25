@@ -79,6 +79,9 @@ paymentIntent.amount.pointDiscount;
 paymentIntent.amount.tokenDue;
 paymentIntent.points?.account?.availableBalance;
 paymentIntent.points?.account?.expiringSoonLot?.amount;
+paymentIntent.points?.account?.nextExpiration?.amount;
+paymentIntent.points?.account?.nextExpiration?.validThrough;
+paymentIntent.points?.account?.nextExpiration?.expiresAt;
 paymentIntent.points?.authorization?.holderAddress;
 paymentIntent.points?.authorization?.amount;
 paymentIntent.points?.authorization?.maximumAmount;
@@ -166,8 +169,11 @@ Merchant image, then a local placeholder. Handle image load errors directly;
 do not issue HTTP `HEAD` requests to probe whether an image URL exists.
 
 `points.account` and top-level `reward` are nullable additive context. During
-a pending checkout, `points.account.expiringSoonLot` is the viewing wallet's
-earliest-expiring usable lot. Terminal PaymentIntents return `points.account`
+a pending checkout, `points.account.nextExpiration` aggregates all eligible
+points sharing the earliest expiration date. Render `validThrough` as the last
+usable date in Japan time and compare the current instant with exclusive
+`expiresAt`. `expiringSoonLot` remains for compatibility and is not recommended
+for new integrations. Terminal PaymentIntents return `points.account`
 as null but retain durable authorization history. After token settlement,
 `confirmedPayments[].fromAddress` identifies the verified sender. For an
 A-bound point attempt, successful settlement requires that sender to be A;
