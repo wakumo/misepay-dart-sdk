@@ -292,6 +292,22 @@ final updatedIntent = await client.paymentIntents.applyPoints(
 );
 ```
 
+For an EIP-6492 wrapped smart-account signature, pass the chain on which the
+smart account is verified:
+
+```dart
+final updatedIntent = await client.paymentIntents.applyPoints(
+  paymentIntent: paymentIntent,
+  authorization: authorization,
+  signature: signature,
+  verificationChainId: 80002,
+);
+```
+
+The SDK sends this as `verification_chain_id`. The backend requires it for
+EIP-6492, while EOA callers can omit it. It may differ from the selected
+payment option's `chainId` and is not included in the EIP-712 typed data.
+
 An open checkout remains `PaymentIntentStatus.pending` after partial point
 application. Replace local checkout state with `updatedIntent`, then send the
 selected payment option's exact `amountBaseUnits` when `updatedIntent.status`

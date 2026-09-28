@@ -1054,6 +1054,37 @@ void main() {
           'https://api-dev.misepay.app/v1/payment-intents/pi_123');
     });
 
+    test('submits verification chain independently of payment options',
+        () async {
+      final requests = <http.Request>[];
+      final client = MisePayClient(
+        allowedOrigins: {'https://api-dev.misepay.app'},
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          return _jsonResponse(_paymentIntentJson(
+              payer: _payerJson(intentAmount: '2', available: '3')));
+        }),
+      );
+      final intent = PaymentIntent.fromJson(
+          _paymentIntentJson(payer: _payerJson(intentAmount: '0')));
+      final authorization = client.paymentIntents.authorizePoints(
+        paymentIntent: intent,
+        pointAmount: '2',
+      );
+
+      await client.paymentIntents.applyPoints(
+        paymentIntent: intent,
+        authorization: authorization,
+        signature: '0xsig',
+        verificationChainId: 80002,
+      );
+
+      final payload = jsonDecode(requests.single.body) as Map<String, dynamic>;
+      expect(intent.paymentOptions.single.chainId, 137);
+      expect(payload['verification_chain_id'], 80002);
+      expect(payload.containsKey('chain_id'), isFalse);
+    });
+
     test('submits point authorization in point units for 6-decimal JPYC',
         () async {
       final requests = <http.Request>[];

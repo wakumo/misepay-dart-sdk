@@ -38,6 +38,22 @@ await misepayClient.paymentIntents.provePayment(
 );
 ```
 
+For an EIP-6492 wrapped signature, pass the smart account's verification chain
+when calling `applyPoints`:
+
+```dart
+final updatedPaymentIntent = await misepayClient.paymentIntents.applyPoints(
+  paymentIntent: paymentIntent,
+  authorization: authorization,
+  signature: signature,
+  verificationChainId: 80002,
+);
+```
+
+The SDK encodes this as `verification_chain_id`; the backend requires it for
+EIP-6492 but not for EOA. This verification chain may differ from the payment
+option's `chainId` and is not part of the EIP-712 domain or message.
+
 ## Key Rules
 
 - Checkout creation returns `{ order, payment_intent }`; the initial GET URL is `payment_intent.request_uri`, exposed by the SDK as `PaymentIntent.requestUri`.
@@ -70,6 +86,7 @@ await misepayClient.paymentIntents.provePayment(
 - The single EIP-712 domain version `1` message signs `intentId`, `payer`, `pointAmount`, `authorizationRevision`, and `expiresAt`. The SDK signs the current response revision plus one; the first authorization therefore uses revision `1`.
 - `authorizePoints` is local SDK logic and MUST NOT call a quote endpoint.
 - Any point amount change requires a new signature and the next revision. `applyPoints` always submits the required `authorization_revision` field.
+- `applyPoints.verificationChainId` is optional for EOA and must be supplied for an EIP-6492 wrapped signature. It becomes `verification_chain_id` in the submit body, not the payment-proof `chain_id`.
 - If current point amount is already `0`, cancellation is a no-op and should not submit.
 - On submission, the backend locks canonical state and recomputes current remaining value, available point balance, benefit, net amount, and settlement base units before reserving points.
 - A signature remains usable after verified payment state changes only while its exact point amount is within the current remaining value.
@@ -334,9 +351,13 @@ The payer selects a total target of `1200` point units at revision `1` for `pi_1
   "payer_address": "0xabc...",
   "point_amount": "1200",
   "authorization_revision": 1,
+  "verification_chain_id": 80002,
   "signature": "0x..."
 }
 ```
+
+The example above is for EIP-6492. Omit `verification_chain_id` for an EOA
+signature.
 
 ## Transaction Hash Submit Body
 

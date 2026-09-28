@@ -14,6 +14,7 @@ abstract interface class PaymentIntentRepository {
     required PaymentIntent intent,
     required PointAuthorization authorization,
     required String signature,
+    int? verificationChainId,
   });
 
   /// Submits an on-chain transaction hash to the PaymentIntent action URL.

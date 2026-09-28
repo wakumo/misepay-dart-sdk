@@ -47,16 +47,22 @@ class PaymentIntentsClient {
   }
 
   /// Submits a signed point authorization to [paymentIntent]'s action URL.
+  ///
+  /// [verificationChainId] is the smart account's verification chain for an
+  /// EIP-6492 wrapped signature. It is independent of the payment chain and
+  /// can be omitted for an EOA signature.
   Future<PaymentIntent> applyPoints({
     required PaymentIntent paymentIntent,
     required PointAuthorization authorization,
     required String signature,
+    int? verificationChainId,
   }) {
     _assertAuthorizationHolderMatches(paymentIntent, authorization);
     return _repository.submitPointAuthorization(
       intent: paymentIntent,
       authorization: authorization,
       signature: signature,
+      verificationChainId: verificationChainId,
     );
   }
 
