@@ -37,6 +37,7 @@ class PaymentIntentApi implements PaymentIntentRepository {
     required PaymentIntent intent,
     required PointAuthorization authorization,
     required String signature,
+    int? verificationChainId,
   }) async {
     final actionUrl = intent.actions.submitPointAuthorization;
     if (actionUrl == null) {
@@ -49,6 +50,7 @@ class PaymentIntentApi implements PaymentIntentRepository {
       body: pointAuthorizationPayload(
         authorization: authorization,
         signature: signature,
+        verificationChainId: verificationChainId,
       ),
     );
     return PaymentIntent.fromJson(parseJsonObjectResponse(response));

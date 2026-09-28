@@ -5,11 +5,14 @@ import '../domain/point_authorization.dart';
 String pointAuthorizationPayload({
   required PointAuthorization authorization,
   required String signature,
+  int? verificationChainId,
 }) {
   return jsonEncode({
     'payer_address': authorization.payerAddress,
     'point_amount': authorization.pointAmount,
     'authorization_revision': authorization.authorizationRevision,
+    if (verificationChainId != null)
+      'verification_chain_id': verificationChainId,
     'signature': signature,
   });
 }
